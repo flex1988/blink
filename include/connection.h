@@ -1,5 +1,5 @@
-#ifndef __PIKA_CONNECTION__
-#define __PIKA_CONNECTION__
+#ifndef __CONNECTION_H__
+#define __CONNECTION_H__
 
 #include "server.h"
 
@@ -23,6 +23,16 @@ public:
 
     ~Connection();
 
+    void sendReply(muduo::string msg);
+
+    void sendReplyValue(std::string value);
+
+    void sendError(muduo::string msg);
+
+    void setProtocolError(muduo::net::Buffer* buf, muduo::string msg, int pos);
+
+    std::vector<std::string> _argv;
+
 private:
     void onMessage(const muduo::net::TcpConnectionPtr& conn,
                    muduo::net::Buffer* buf, muduo::Timestamp);
@@ -35,12 +45,6 @@ private:
 
     bool splitQueryArgs(std::string);
 
-    void sendReply(muduo::string msg);
-
-    void sendError(muduo::string msg);
-
-    void setProtocolError(muduo::net::Buffer* buf, muduo::string msg, int pos);
-
     void reset();
 
     Server* _owner;
@@ -50,7 +54,5 @@ private:
     int _flags;
     int _multibulklen;
     int _bulklen;
-
-    std::vector<std::string> _argv;
 };
 #endif

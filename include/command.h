@@ -14,4 +14,6 @@ struct RedisCommand {
 void initRedisCommand();
 
 RedisCommand* lookupCommand(std::string cmd);
+
+void initRocksDB();
 #endif

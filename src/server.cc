@@ -11,6 +11,7 @@ Server::Server(muduo::net::EventLoop* loop)
     : _loop(loop), _server(loop, muduo::net::InetAddress(1234), "pika")
 {
     _server.setConnectionCallback(boost::bind(&Server::onConnection, this, _1));
+    _server.setThreadNum(2);
 }
 
 Server::~Server() {}

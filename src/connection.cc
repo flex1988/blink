@@ -1,8 +1,11 @@
 #include "connection.h"
 #include "command.h"
+#include "common.h"
 #include "server.h"
 
 #include <muduo/base/Logging.h>
+
+#include <boost/format.hpp>
 
 Connection::Connection(Server* owner, const muduo::net::TcpConnectionPtr& conn)
     : _owner(owner),
@@ -21,6 +24,8 @@ void Connection::onMessage(const muduo::net::TcpConnectionPtr& conn,
                            muduo::net::Buffer* buf, muduo::Timestamp time)
 {
     while (buf->readableBytes() > 0) {
+        if (_flags & CONN_CLOSE_AFTER_REPLY) break;
+
         if (_reqtype == PROTO_NULL) {
             if (*buf->peek() == '*') {
                 _reqtype = PROTO_MULTIBULK;
@@ -86,7 +91,7 @@ bool Connection::processInlineBuffer(muduo::net::Buffer* buf)
 bool Connection::processMultibulkBuffer(muduo::net::Buffer* buf)
 {
     const char* newline = NULL;
-    int pos = 0, ok;
+    int pos = 0;
     long long ll;
 
     if (_multibulklen == 0) {
@@ -99,6 +104,7 @@ bool Connection::processMultibulkBuffer(muduo::net::Buffer* buf)
             return false;
         }
 
+        assert(*buf->peek() == '*');
         ll = std::stoll(
             std::string(buf->peek() + 1, newline - (buf->peek() + 1)), NULL, 0);
         if (ll > 1024 * 1024) {
@@ -108,7 +114,6 @@ bool Connection::processMultibulkBuffer(muduo::net::Buffer* buf)
         }
 
         pos = (newline - buf->peek()) + 2;
-        LOG_INFO<<pos;
         if (ll <= 0) {
             buf->retrieve(pos);
             return true;
@@ -174,7 +179,7 @@ void Connection::reset()
     _argv.clear();
     _reqtype = PROTO_NULL;
     _multibulklen = 0;
-    _bulklen = 0;
+    _bulklen = -1;
 }
 
 bool Connection::processCommand()
@@ -186,7 +191,7 @@ bool Connection::processCommand()
     }
 
     RedisCommand* cmd = lookupCommand(_argv[0]);
-    
+
     if (!cmd) {
         sendError("unknown command: " + muduo::string(_argv[0].c_str()));
         return true;
@@ -197,6 +202,12 @@ bool Connection::processCommand()
     return true;
 }
 
+void Connection::sendReplyValue(std::string value)
+{
+    std::string reply =
+        str(boost::format("$%1%\r\n%2%\r\n") % value.size() % value.c_str());
+    _conn->send(muduo::string(reply.c_str()));
+}
 void Connection::sendReply(muduo::string msg) { _conn->send(msg); }
 void Connection::sendError(muduo::string msg)
 {

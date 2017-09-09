@@ -8,6 +8,8 @@
 int main(int argc,char **argv){
     initRedisCommand();
 
+    initRocksDB();
+
     muduo::net::EventLoop loop;
     
     Server server(&loop);
