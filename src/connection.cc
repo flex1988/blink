@@ -6,6 +6,8 @@
 #include <muduo/base/Logging.h>
 
 #include <boost/format.hpp>
+#include <boost/algorithm/string.hpp> 
+
 
 Connection::Connection(Server* owner, const muduo::net::TcpConnectionPtr& conn)
     : _owner(owner),
@@ -189,6 +191,8 @@ bool Connection::processCommand()
         _flags |= CONN_CLOSE_AFTER_REPLY;
         return false;
     }
+
+    boost::algorithm::to_lower(_argv[0]);
 
     RedisCommand* cmd = lookupCommand(_argv[0]);
 

@@ -30,8 +30,8 @@ void setCommand(Connection* conn)
 }
 void initRedisCommand()
 {
-    _cmdMap["GET"] = {"get", getCommand, 0};
-    _cmdMap["SET"] = {"set", setCommand, 0};
+    _cmdMap["get"] = {"get", getCommand, 0};
+    _cmdMap["set"] = {"set", setCommand, 0};
 }
 
 RedisCommand* lookupCommand(std::string cmd)

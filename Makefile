@@ -8,7 +8,7 @@ all: pika $(obj)
 
 CC := g++
 
-CFLAGS := -lmuduo_net -lmuduo_base -lrocksdb -pthread -Iinclude -std=c++11
+CFLAGS := -lmuduo_net -lmuduo_base -lrocksdb -lz -lbz2 -pthread -Iinclude -std=c++11
 
 pika: $(obj)
 	$(CC) -o build/pika  $(wildcard build/*.o) $(CFLAGS)
