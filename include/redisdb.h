@@ -15,8 +15,8 @@ public:
     // Status Del(const std::string &key, int64_t *count);
     // Status Set(const std::string &key, const std::string &val,
     // const int32_t ttl = 0);
-    // Status Get(const std::string &key, std::string *val);
-    rocksdb::Status Put(const std::string& key, const std::string& val);
+    rocksdb::Status Get(const std::string& key, std::string& val);
+    rocksdb::Status Set(const std::string& key, const std::string& val);
 
 private:
     std::string _path;

@@ -6,7 +6,7 @@
 #include <muduo/net/inspect/Inspector.h>
 
 int main(int argc,char **argv){
-    initRedisCommand();
+    CommandDict::initRedisCommand();
 
     muduo::net::EventLoop loop;
     

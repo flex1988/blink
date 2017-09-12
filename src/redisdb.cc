@@ -18,7 +18,4 @@ RedisDB::RedisDB(const std::string& path)
 }
 
 RedisDB::~RedisDB() {}
-rocksdb::Status RedisDB::Put(const std::string& key, const std::string& val)
-{
-    return _db->Put(rocksdb::WriteOptions(), key, val);
-}
+

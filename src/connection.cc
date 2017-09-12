@@ -193,7 +193,7 @@ bool Connection::processCommand()
 
     boost::algorithm::to_lower(_argv[0]);
 
-    RedisCommand* cmd = lookupCommand(_argv[0]);
+    RedisCommand* cmd = CommandDict::lookupCommand(_argv[0]);
 
     if (!cmd) {
         sendError("unknown command: " + muduo::string(_argv[0].c_str()));

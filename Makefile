@@ -1,6 +1,6 @@
 build_dir := build
 
-obj := $(build_dir)/server.o $(build_dir)/connection.o $(build_dir)/pika.o $(build_dir)/command.o $(build_dir)/redisdb.o
+obj := $(build_dir)/server.o $(build_dir)/connection.o $(build_dir)/pika.o $(build_dir)/command.o $(build_dir)/redisdb.o $(build_dir)/redis_kv.o
 
 .PHONY: all
 
