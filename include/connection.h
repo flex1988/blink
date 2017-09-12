@@ -34,8 +34,7 @@ public:
     std::vector<std::string> _argv;
 
 private:
-    void onMessage(const muduo::net::TcpConnectionPtr& conn,
-                   muduo::net::Buffer* buf, muduo::Timestamp);
+    void onMessage(const muduo::net::TcpConnectionPtr& conn, muduo::net::Buffer* buf, muduo::Timestamp);
 
     bool processInlineBuffer(muduo::net::Buffer* buf);
 

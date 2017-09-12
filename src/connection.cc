@@ -9,20 +9,13 @@
 #include <boost/format.hpp>
 
 Connection::Connection(Server* owner, const muduo::net::TcpConnectionPtr& conn)
-    : _owner(owner),
-      _conn(conn),
-      _reqtype(PROTO_NULL),
-      _flags(0),
-      _multibulklen(0),
-      _bulklen(-1)
+    : _owner(owner), _conn(conn), _reqtype(PROTO_NULL), _flags(0), _multibulklen(0), _bulklen(-1)
 {
-    _conn->setMessageCallback(
-        boost::bind(&Connection::onMessage, this, _1, _2, _3));
+    _conn->setMessageCallback(boost::bind(&Connection::onMessage, this, _1, _2, _3));
 }
 
 Connection::~Connection() {}
-void Connection::onMessage(const muduo::net::TcpConnectionPtr& conn,
-                           muduo::net::Buffer* buf, muduo::Timestamp time)
+void Connection::onMessage(const muduo::net::TcpConnectionPtr& conn, muduo::net::Buffer* buf, muduo::Timestamp time)
 {
     while (buf->readableBytes() > 0) {
         if (_flags & CONN_CLOSE_AFTER_REPLY) break;
@@ -106,8 +99,7 @@ bool Connection::processMultibulkBuffer(muduo::net::Buffer* buf)
         }
 
         assert(*buf->peek() == '*');
-        ll = std::stoll(
-            std::string(buf->peek() + 1, newline - (buf->peek() + 1)), NULL, 0);
+        ll = std::stoll(std::string(buf->peek() + 1, newline - (buf->peek() + 1)), NULL, 0);
         if (ll > 1024 * 1024) {
             sendError("Protocol error: invalid multibulk length");
             setProtocolError(buf, "invalid mbulk count", pos);
@@ -137,15 +129,12 @@ bool Connection::processMultibulkBuffer(muduo::net::Buffer* buf)
             }
 
             if (*buf->peek() != '$') {
-                sendError("Protocol error: expected '$', got %c" +
-                          *buf->peek());
+                sendError("Protocol error: expected '$', got %c" + *buf->peek());
                 setProtocolError(buf, "expected $ but got something else", 0);
                 return false;
             }
 
-            ll = std::stoll(
-                std::string(buf->peek() + 1, newline - (buf->peek() + 1)), NULL,
-                0);
+            ll = std::stoll(std::string(buf->peek() + 1, newline - (buf->peek() + 1)), NULL, 0);
 
             if (ll < 0 || ll > 512 * 1024 * 1024) {
                 sendError("Protocol error: invalid bulk length");
@@ -212,8 +201,7 @@ bool Connection::processCommand()
 
 void Connection::sendReplyValue(std::string value)
 {
-    std::string reply =
-        str(boost::format("$%1%\r\n%2%\r\n") % value.size() % value.c_str());
+    std::string reply = str(boost::format("$%1%\r\n%2%\r\n") % value.size() % value.c_str());
     _conn->send(muduo::string(reply.c_str()));
 }
 void Connection::sendReply(muduo::string msg) { _conn->send(msg); }
@@ -223,8 +211,7 @@ void Connection::sendError(muduo::string msg)
     _conn->send(ret);
 }
 
-void Connection::setProtocolError(muduo::net::Buffer* buf, muduo::string msg,
-                                  int len)
+void Connection::setProtocolError(muduo::net::Buffer* buf, muduo::string msg, int len)
 {
     _flags |= CONN_CLOSE_AFTER_REPLY;
     buf->retrieve(len);
