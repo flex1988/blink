@@ -9,6 +9,7 @@ struct RedisCommand {
     std::string name;
     redisCommandProc* proc;
     int flags;
+    int argc;
 };
 
 void initRedisCommand();

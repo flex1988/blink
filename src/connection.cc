@@ -5,9 +5,8 @@
 
 #include <muduo/base/Logging.h>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
-#include <boost/algorithm/string.hpp> 
-
 
 Connection::Connection(Server* owner, const muduo::net::TcpConnectionPtr& conn)
     : _owner(owner),
@@ -198,6 +197,11 @@ bool Connection::processCommand()
 
     if (!cmd) {
         sendError("unknown command: " + muduo::string(_argv[0].c_str()));
+        return true;
+    }
+
+    if (cmd->argc != _argv.size()) {
+        sendError("wrong number of arguments");
         return true;
     }
 
