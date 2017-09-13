@@ -3,29 +3,48 @@
 
 #include "common.h"
 
-struct ListMetaItem {
+struct ListMetaBlock {
     int32_t addr;  // meta item address
-    int32_t size;   // meta item contain keys
+    int32_t size;  // meta item contain keys
 };
 
-struct ListMeta {
-    int64_t size;           // total element number
-    int64_t addr_seq;            // current max element sequence+1
-    int64_t limit;          // maxmum element number
-    int64_t msize;          // total meta item size
-    int64_t mlimit;         // maxmum meta item number
-    ListMetaItem items[0];  // meta items array
-};
-
-struct ListMetaIndex {
-    int64_t addr[4096];
-};
-
-class Meta {
+class ListMeta {
 public:
-    static std::string EncodeListMeta();
+    ListMeta();
+    ListMeta(std::string);
+    std::string toString();
+    ListMetaBlock *getBlock(int);
+    int fetchSeq();
+    int currentSeq();
 
-private:
-    Meta();
+    int64_t _size;
+    int64_t _limit;
+    int64_t _addr_seq;
+    int64_t _msize;
+    int64_t _mlimit;
+    ListMetaBlock _blocks[LIST_META_BLOCKS];
 };
+
+struct ListMetaBlockKeys {
+    int64_t addr[LIST_BLOCK_KEYS];
+
+    ListMetaBlockKeys() {}
+    ListMetaBlockKeys(std::string str) { str.copy((char *)addr, sizeof(int64_t) * LIST_BLOCK_KEYS); }
+    std::string toString()
+    {
+        std::string str;
+        str.append((char *)addr, sizeof(int64_t) * LIST_BLOCK_KEYS);
+        return str;
+    }
+
+    void insert(int index, int size, int val)
+    {
+        int cursor = size;
+        while (cursor > index) {
+            addr[cursor] = addr[--cursor];
+        }
+        addr[index] = val;
+    }
+};
+
 #endif

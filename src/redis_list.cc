@@ -12,58 +12,93 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
     rocksdb::Status s;
     rocksdb::WriteBatch batch;
 
-    std::string meta_key = "L1:" + key;
-    std::string meta_val;
+    std::string metakey = "L1:" + key;
+    std::string metaval;
 
     RecordLock l(&_mutex_list_record, key);
 
-    s = _list->Get(rocksdb::ReadOptions(), meta_key, &meta_val);
+    s = _list->Get(rocksdb::ReadOptions(), metakey, &metaval);
 
     if (s.ok()) {
-        ListMeta* meta = (ListMeta*)meta_val.c_str();
-        meta->size++;
-        if (meta->size == meta->limit) {
+        ListMeta meta(metaval);
+
+        if (meta._size == meta._limit) {
             return rocksdb::Status::InvalidArgument("Maximum element size limited");
         }
 
-        ListMetaItem* mitem = &meta->items[0];
-        if (mitem->size == LIST_BLOCK_SIZE) {
-            if (meta->msize == LIST_META_SIZE) {
+        meta._size++;
+
+        ListMetaBlock* mblock = meta.getBlock(0);
+        if (mblock->size == LIST_BLOCK_KEYS) {
+            if (meta._msize == LIST_META_BLOCKS) {
                 return rocksdb::Status::InvalidArgument("Maximum block size limited");
             }
-
-            meta_val = meta_val.substr(0, 40) + std::string(8, 0) + meta_val.substr(40);
-            meta = (ListMeta*)meta_val.c_str();
-            mitem = meta->items[0];
         }
 
-        mitem->size++;
+        // mitem->size == 0 means index key not exists
+        if (mblock->size == 0) {
+            mblock->size++;
+            mblock->addr = meta.fetchSeq();
+
+            std::string blockkey = "L2:" + std::to_string(mblock->addr) + ":" + key;
+
+            ListMetaBlockKeys keys;
+            keys.addr[0] = meta.fetchSeq();
+
+            std::string leaf = "l:" + std::to_string(keys.addr[0]) + ":" + key;
+
+            batch.Put(metakey, meta.toString());
+            batch.Put(blockkey, keys.toString());
+            batch.Put(leaf, val);
+
+            s = _list->Write(rocksdb::WriteOptions(), &batch);
+            return s;
+        }
+        else {
+            mblock->size++;
+
+            std::string blockkey = "L2:0:" + key;
+            std::string blockval;
+
+            s = _list->Get(rocksdb::ReadOptions(), blockkey, &blockval);
+
+            if (!s.ok()) return s;
+
+            ListMetaBlockKeys keys(blockval);
+            keys.insert(0, mblock->size, meta.fetchSeq());
+
+            std::string leaf = "l:" + std::to_string(meta.currentSeq()) + ":" + key;
+
+            batch.Put(metakey, meta.toString());
+            batch.Put(blockkey, keys.toString());
+            batch.Put(leaf, val);
+
+            s = _list->Write(rocksdb::WriteOptions(), &batch);
+            return s;
+        }
     }
     else if (s.IsNotFound()) {
-        meta_val.reserve(LIST_META_SIZE * sizeof(struct ListMetaItem) + sizeof(ListMeta));
-        ListMeta* meta = (ListMeta*)meta_val.c_str();
-        meta->size = 1;
-        meta->addr_seq = 0;
-        meta->limit = LIST_ELEMENT_SIZE;
-        meta->msize = 1;
-        meta->mlimit = LIST_META_SIZE;
+        ListMeta meta;
+        ListMetaBlock* mblock = meta.getBlock(0);
 
-        ListMetaItem* mitem = &meta->items[0];
-        mitem->addr = 0;
-        mitem->size = 1;
+        mblock->addr = meta.fetchSeq();
+        mblock->size = 1;
 
-        batch.Put(meta_key, meta_val);
+        metaval = meta.toString();
 
-        std::string meta_idx = "L2:0:" + key;
-        std::string meta_idx_val;
+        std::string block = "L2:" + std::to_string(mblock->addr) + ":" + key;
+        std::string blockval;
 
-        meta_idx_val.reserve(4096 * sizeof(int64_t));
-        ListMetaIndex* idx = (ListMetaIndex*)meta_idx_val.c_str();
-        idx->addr[0] = meta->addr_seq++;
-        batch.Put(meta_idx, meta_idx_val);
+        ListMetaBlockKeys keys;
+        keys.addr[0] = meta.fetchSeq();
+        blockval = keys.toString();
 
-        std::string leaf = "l:0:" + key;
+        std::string leaf = "l:" + std::to_string(keys.addr[0]) + ":" + key;
+
+        batch.Put(metakey, metaval);
+        batch.Put(block, blockval);
         batch.Put(leaf, val);
+
         s = _list->Write(rocksdb::WriteOptions(), &batch);
         return s;
     }
