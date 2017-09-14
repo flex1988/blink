@@ -22,12 +22,12 @@ void CommandDict::getCommand(Connection* conn)
     }
 
     if (!s.ok()) {
-        conn->sendError("interval error");
+        conn->sendReplyError("interval error");
         LOG_ERROR << s.getState();
         return;
     }
 
-    conn->sendReplyValue(value);
+    conn->sendReplyBulk(value);
 }
 
 void CommandDict::setCommand(Connection* conn)
@@ -35,7 +35,7 @@ void CommandDict::setCommand(Connection* conn)
     rocksdb::Status s = _redisdb->Set(conn->_argv[1], conn->_argv[2]);
 
     if (!s.ok()) {
-        conn->sendError("internal error");
+        conn->sendReplyError("internal error");
         LOG_ERROR << s.getState();
         return;
     }
@@ -43,10 +43,25 @@ void CommandDict::setCommand(Connection* conn)
     conn->sendReply("+OK\r\n");
 }
 
+void CommandDict::lpushCommand(Connection* conn)
+{
+    int64_t size;
+    rocksdb::Status s = _redisdb->LPush(conn->_argv[1], conn->_argv[2], &size);
+
+    if (!s.ok()) {
+        conn->sendReplyError("internal error");
+        LOG_ERROR << s.getState();
+        return;
+    }
+
+    conn->sendReplyLongLong(size);
+}
+
 void CommandDict::initRedisCommand()
 {
     _cmdMap["get"] = {"get", CommandDict::getCommand, 0, 2};
     _cmdMap["set"] = {"set", CommandDict::setCommand, 0, 3};
+    _cmdMap["lpush"] = {"lpush", CommandDict::lpushCommand, 0, 3};
 }
 
 RedisCommand* CommandDict::lookupCommand(std::string cmd)

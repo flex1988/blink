@@ -29,7 +29,7 @@ struct ListMetaBlockKeys {
     int64_t addr[LIST_BLOCK_KEYS];
 
     ListMetaBlockKeys() {}
-    ListMetaBlockKeys(std::string str) { str.copy((char *)addr, sizeof(int64_t) * LIST_BLOCK_KEYS); }
+    ListMetaBlockKeys(const std::string &str) { str.copy((char *)addr, sizeof(int64_t) * LIST_BLOCK_KEYS); }
     std::string toString()
     {
         std::string str;

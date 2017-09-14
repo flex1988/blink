@@ -59,7 +59,7 @@ bool Connection::processInlineBuffer(muduo::net::Buffer* buf)
 
     if (newline == NULL) {
         if (buf->readableBytes() > PROTO_INLINE_MAX_SIZE) {
-            sendError("Protocol error: too big inline request");
+            sendReplyError("Protocol error: too big inline request");
             setProtocolError(buf, "too big mbulk count string", 0);
         }
         return false;
@@ -72,7 +72,7 @@ bool Connection::processInlineBuffer(muduo::net::Buffer* buf)
     splitQueryArgs(req);
 
     if (_argv.size() == 0) {
-        sendError("Protocol error: unbalanced quotes in request");
+        sendReplyError("Protocol error: unbalanced quotes in request");
         setProtocolError(buf, "unbalanced quotes in inline request", 0);
         return false;
     }
@@ -92,7 +92,7 @@ bool Connection::processMultibulkBuffer(muduo::net::Buffer* buf)
         newline = buf->findCRLF();
         if (newline == NULL) {
             if (buf->readableBytes() > PROTO_INLINE_MAX_SIZE) {
-                sendError("Protocol error: too big mbulk count string");
+                sendReplyError("Protocol error: too big mbulk count string");
                 setProtocolError(buf, "too big mbulk count string", 0);
             }
             return false;
@@ -101,7 +101,7 @@ bool Connection::processMultibulkBuffer(muduo::net::Buffer* buf)
         assert(*buf->peek() == '*');
         ll = std::stoll(std::string(buf->peek() + 1, newline - (buf->peek() + 1)), NULL, 0);
         if (ll > 1024 * 1024) {
-            sendError("Protocol error: invalid multibulk length");
+            sendReplyError("Protocol error: invalid multibulk length");
             setProtocolError(buf, "invalid mbulk count", pos);
             return false;
         }
@@ -121,7 +121,7 @@ bool Connection::processMultibulkBuffer(muduo::net::Buffer* buf)
             newline = buf->findCRLF();
             if (newline == NULL) {
                 if (buf->readableBytes() > PROTO_INLINE_MAX_SIZE) {
-                    sendError("Protocol error: too big mbulk count string");
+                    sendReplyError("Protocol error: too big mbulk count string");
                     setProtocolError(buf, "too big bulk count string", 0);
                     return false;
                 }
@@ -129,7 +129,7 @@ bool Connection::processMultibulkBuffer(muduo::net::Buffer* buf)
             }
 
             if (*buf->peek() != '$') {
-                sendError("Protocol error: expected '$', got %c" + *buf->peek());
+                sendReplyError("Protocol error: expected '$', got %c" + *buf->peek());
                 setProtocolError(buf, "expected $ but got something else", 0);
                 return false;
             }
@@ -137,7 +137,7 @@ bool Connection::processMultibulkBuffer(muduo::net::Buffer* buf)
             ll = std::stoll(std::string(buf->peek() + 1, newline - (buf->peek() + 1)), NULL, 0);
 
             if (ll < 0 || ll > 512 * 1024 * 1024) {
-                sendError("Protocol error: invalid bulk length");
+                sendReplyError("Protocol error: invalid bulk length");
                 setProtocolError(buf, "invalid bulk length", 0);
                 return false;
             }
@@ -185,12 +185,12 @@ bool Connection::processCommand()
     RedisCommand* cmd = CommandDict::lookupCommand(_argv[0]);
 
     if (!cmd) {
-        sendError("unknown command: " + muduo::string(_argv[0].c_str()));
+        sendReplyError("unknown command: " + _argv[0]);
         return true;
     }
 
     if (cmd->argc != _argv.size()) {
-        sendError("wrong number of arguments");
+        sendReplyError("wrong number of arguments");
         return true;
     }
 
@@ -199,22 +199,28 @@ bool Connection::processCommand()
     return true;
 }
 
-void Connection::sendReplyValue(std::string value)
+void Connection::sendReplyBulk(const std::string& value)
 {
     std::string reply = str(boost::format("$%1%\r\n%2%\r\n") % value.size() % value.c_str());
     _conn->send(muduo::string(reply.c_str()));
 }
-void Connection::sendReply(muduo::string msg) { _conn->send(msg); }
-void Connection::sendError(muduo::string msg)
+void Connection::sendReply(const std::string& msg) { _conn->send(muduo::string(msg.c_str())); }
+void Connection::sendReplyError(const std::string& msg)
 {
-    muduo::string ret = "-ERR " + msg + "\r\n";
-    _conn->send(ret);
+    std::string ret = "-ERR " + msg + "\r\n";
+    _conn->send(muduo::string(ret.c_str()));
 }
 
 void Connection::setProtocolError(muduo::net::Buffer* buf, muduo::string msg, int len)
 {
     _flags |= CONN_CLOSE_AFTER_REPLY;
     buf->retrieve(len);
+}
+
+void Connection::sendReplyLongLong(int64_t val)
+{
+    std::string ret = ":" + std::to_string(val) + "\r\n";
+    _conn->send(muduo::string(ret.c_str()));
 }
 
 bool Connection::splitQueryArgs(std::string req)

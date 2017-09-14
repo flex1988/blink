@@ -23,11 +23,13 @@ public:
 
     ~Connection();
 
-    void sendReply(muduo::string msg);
+    void sendReply(const std::string& msg);
 
-    void sendReplyValue(std::string value);
+    void sendReplyBulk(const std::string& value);
 
-    void sendError(muduo::string msg);
+    void sendReplyError(const std::string& msg);
+
+    void sendReplyLongLong(int64_t val);
 
     void setProtocolError(muduo::net::Buffer* buf, muduo::string msg, int pos);
 

@@ -3,6 +3,14 @@
 #include "mutex.h"
 #include "redisdb.h"
 
+std::string _toString(char* addr)
+{
+    std::string str;
+    str.reserve(sizeof(int64_t) * LIST_BLOCK_KEYS);
+    str.append(addr, sizeof(int64_t) * LIST_BLOCK_KEYS);
+    return str;
+}
+
 rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, int64_t* llen)
 {
     if (key.size() >= KEY_MAX_LENGTH || key.size() <= 0) {
@@ -41,17 +49,22 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
             mblock->addr = meta.fetchSeq();
 
             std::string blockkey = "L2:" + std::to_string(mblock->addr) + ":" + key;
+            std::string blockval;
 
             ListMetaBlockKeys keys;
             keys.addr[0] = meta.fetchSeq();
+            blockval = keys.toString();
 
             std::string leaf = "l:" + std::to_string(keys.addr[0]) + ":" + key;
 
             batch.Put(metakey, meta.toString());
-            batch.Put(blockkey, keys.toString());
+            batch.Put(blockkey, blockval);
             batch.Put(leaf, val);
 
             s = _list->Write(rocksdb::WriteOptions(), &batch);
+
+            if (s.ok()) *llen = meta._size;
+
             return s;
         }
         else {
@@ -66,18 +79,23 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
 
             ListMetaBlockKeys keys(blockval);
             keys.insert(0, mblock->size, meta.fetchSeq());
+            blockval = keys.toString();
 
             std::string leaf = "l:" + std::to_string(meta.currentSeq()) + ":" + key;
 
             batch.Put(metakey, meta.toString());
-            batch.Put(blockkey, keys.toString());
+            batch.Put(blockkey, blockval);
             batch.Put(leaf, val);
 
             s = _list->Write(rocksdb::WriteOptions(), &batch);
+
+            if (s.ok()) *llen = meta._size;
+
             return s;
         }
     }
     else if (s.IsNotFound()) {
+        LOG_INFO << "not found";
         ListMeta meta;
         ListMetaBlock* mblock = meta.getBlock(0);
 
@@ -100,6 +118,7 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
         batch.Put(leaf, val);
 
         s = _list->Write(rocksdb::WriteOptions(), &batch);
+        if (s.ok()) *llen = meta._size;
         return s;
     }
     else {
