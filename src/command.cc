@@ -57,11 +57,26 @@ void CommandDict::lpushCommand(Connection* conn)
     conn->sendReplyLongLong(size);
 }
 
+void CommandDict::lIndexCommand(Connection* conn)
+{
+    std::string val;
+    rocksdb::Status s = _redisdb->LIndex(conn->_argv[1], std::stoi(conn->_argv[2], NULL, 0), &val);
+
+    if (!s.ok()) {
+        conn->sendReply("$-1\r\n");
+        LOG_ERROR << s.getState();
+        return;
+    }
+
+    conn->sendReplyBulk(val);
+}
+
 void CommandDict::initRedisCommand()
 {
     _cmdMap["get"] = {"get", CommandDict::getCommand, 0, 2};
     _cmdMap["set"] = {"set", CommandDict::setCommand, 0, 3};
     _cmdMap["lpush"] = {"lpush", CommandDict::lpushCommand, 0, 3};
+    _cmdMap["lindex"] = {"lindex", CommandDict::lIndexCommand, 0, 3};
 }
 
 RedisCommand* CommandDict::lookupCommand(std::string cmd)

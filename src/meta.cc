@@ -1,30 +1,35 @@
+#include "common.h"
 #include "meta.h"
 
-ListMeta::ListMeta() : _size(0), _addr_seq(0), _limit(LIST_ELEMENT_SIZE), _msize(0), _mlimit(LIST_META_BLOCKS) {}
+ListMeta::ListMeta() : size_(0), area_index_(0), limit_(LIST_ELEMENT_SIZE), bsize_(0), blimit_(LIST_META_BLOCKS) {}
 ListMeta::ListMeta(std::string str)
 {
     const char *p = str.data();
-    _size = *(int64_t *)p;
-    _addr_seq = *(int64_t *)(p + sizeof(int64_t));
-    _limit = *(int64_t *)(p + sizeof(int64_t) * 2);
-    _msize = *(int64_t *)(p + sizeof(int64_t) * 3);
-    _mlimit = *(int64_t *)(p + sizeof(int64_t) * 4);
-    str.copy((char *)_blocks, sizeof(ListMetaBlock) * LIST_META_BLOCKS, 40);
+    size_ = *(int64_t *)p;
+    limit_ = *(int64_t *)(p + sizeof(int64_t));
+    assert(limit_ == LIST_ELEMENT_SIZE);
+    bsize_ = *(int64_t *)(p + sizeof(int64_t) * 2);
+    blimit_ = *(int64_t *)(p + sizeof(int64_t) * 3);
+    assert(blimit_ == LIST_META_BLOCKS);
+    area_index_ = *(int64_t *)(p + sizeof(int64_t) * 4);
+    str.copy((char *)blocks_, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS, 40);
 }
 
-std::string ListMeta::toString()
+std::string ListMeta::ToString()
 {
     std::string str;
-    str.append((char *)&_size, sizeof(int64_t));
-    str.append((char *)&_addr_seq, sizeof(int64_t));
-    str.append((char *)&_limit, sizeof(int64_t));
-    str.append((char *)&_msize, sizeof(int64_t));
-    str.append((char *)&_mlimit, sizeof(int64_t));
-    str.append((char *)_blocks, sizeof(ListMetaBlock) * LIST_META_BLOCKS);
+    str.append((char *)&size_, sizeof(int64_t));
+    str.append((char *)&limit_, sizeof(int64_t));
+    str.append((char *)&bsize_, sizeof(int64_t));
+    str.append((char *)&blimit_, sizeof(int64_t));
+    str.append((char *)&area_index_, sizeof(int64_t));
+    str.append((char *)blocks_, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS);
 
     return str;
 }
 
-ListMetaBlock *ListMeta::getBlock(int index) { return &_blocks[index]; }
-int ListMeta::fetchSeq() { return _addr_seq++; }
-int ListMeta::currentSeq() { return _addr_seq; }
+ListMetaBlockPtr *ListMeta::BlockAt(int index) { return &blocks_[index]; }
+int ListMeta::AllocArea() { return area_index_++; }
+int ListMeta::CurrentArea() { return area_index_; }
+bool ListMeta::IsElementsFull() { return size_ == limit_; }
+bool ListMeta::IsBlocksFull() { return bsize_ == blimit_; }

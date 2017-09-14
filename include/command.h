@@ -17,7 +17,10 @@ class CommandDict {
 public:
     static void getCommand(Connection* conn);
     static void setCommand(Connection* conn);
+
     static void lpushCommand(Connection* conn);
+    static void lIndexCommand(Connection* conn);
+
     static void initRedisCommand();
     static RedisCommand* lookupCommand(std::string cmd);
 private:
