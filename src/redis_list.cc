@@ -25,31 +25,19 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
         if (meta.IsElementsFull()) {
             return rocksdb::Status::InvalidArgument("Maximum element size limited: " + std::to_string(meta.Size()));
         }
-
         meta.IncrSize();
 
         ListMetaBlockPtr* blockptr = meta.BlockAt(0);
         if (blockptr->size == LIST_BLOCK_KEYS) {
-            if (meta.IsBlocksFull()) {
+            blockptr = meta.InsertNewMetaBlockPtr(0);
+
+            if (blockptr == NULL) {
                 return rocksdb::Status::InvalidArgument("Maximum block size limited: " + std::to_string(meta.BSize()));
             }
-
-            int cursor = meta.BSize();
-            while (cursor > 0) {
-                *meta.BlockAt(cursor) = *meta.BlockAt(cursor - 1);
-                cursor--;
-            }
-
-            meta.IncrBSize();
-
-            blockptr->size = 0;
-            blockptr->addr = 0;
         }
 
         // mitem->size == 0 means block key not exists
         if (blockptr->size == 0) {
-            meta.IncrBSize();
-
             blockptr->size++;
             blockptr->addr = meta.AllocArea();
 

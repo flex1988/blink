@@ -47,6 +47,8 @@ public:
     int64_t BSize() { return bsize_; };
     int64_t IncrSize() { return size_++; };
     int64_t IncrBSize() { return bsize_++; };
+    ListMetaBlockPtr* InsertNewMetaBlockPtr(int index);
+
 private:
     int64_t size_;
     int64_t limit_;

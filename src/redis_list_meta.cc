@@ -33,3 +33,27 @@ int ListMeta::AllocArea() { return area_index_++; }
 int ListMeta::CurrentArea() { return area_index_; }
 bool ListMeta::IsElementsFull() { return size_ == limit_; }
 bool ListMeta::IsBlocksFull() { return bsize_ == blimit_; }
+ListMetaBlockPtr *ListMeta::InsertNewMetaBlockPtr(int index)
+{
+    if (IsBlocksFull()) {
+        return NULL;
+    }
+
+    if (index > bsize_ || index < 0) {
+        return NULL;
+    }
+
+    int cursor = bsize_;
+    while (cursor > index) {
+        *BlockAt(cursor) = *BlockAt(cursor - 1);
+        cursor--;
+    }
+
+    IncrBSize();
+
+    ListMetaBlockPtr *ptr = BlockAt(index);
+    ptr->size = 0;
+    ptr->addr = 0;
+
+    return ptr;
+}
