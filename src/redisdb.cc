@@ -7,20 +7,16 @@
 
 RedisDB::RedisDB(const std::string& path)
 {
-    _kvoptions.IncreaseParallelism();
-    _kvoptions.create_if_missing = true;
-    _kvoptions.compression = rocksdb::kNoCompression;
+    options_.IncreaseParallelism();
+    options_.create_if_missing = true;
+    options_.compression = rocksdb::kNoCompression;
 
     _path = path;
-    rocksdb::Status s = rocksdb::DB::Open(_kvoptions, _path + "/kv", &_kv);
+    rocksdb::Status s = rocksdb::DB::Open(options_, _path + "/kv", &_kv);
     if (!s.ok()) LOG_INFO << s.getState();
     assert(s.ok());
 
-    _listoptions.IncreaseParallelism();
-    _listoptions.create_if_missing = true;
-    _listoptions.compression = rocksdb::kNoCompression;
-
-    s = rocksdb::DB::Open(_listoptions, _path + "/list", &_list);
+    s = rocksdb::DB::Open(options_, _path + "/list", &_list);
     if (!s.ok()) LOG_INFO << s.getState();
     assert(s.ok());
 }

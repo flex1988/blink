@@ -28,10 +28,8 @@ public:
 private:
     std::string _path;
     rocksdb::DB *_kv;
-    rocksdb::Options _kvoptions;
-
     rocksdb::DB *_list;
-    rocksdb::Options _listoptions;
+    rocksdb::Options options_;
 
     port::RecordMutex _mutex_list_record;
 };
