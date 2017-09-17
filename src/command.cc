@@ -9,7 +9,7 @@
 
 static boost::unordered_map<std::string, RedisCommand> _cmdMap;
 
-static boost::shared_ptr<RedisDB> _redisdb(new RedisDB("/tmp/db"));
+static boost::shared_ptr<RedisDB> _redisdb(new RedisDB("/data1/pika-se/db"));
 
 void CommandDict::getCommand(Connection* conn)
 {

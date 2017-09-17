@@ -9,6 +9,10 @@
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
+#include "rocksdb/utilities/db_ttl.h"
+
+#include <boost/unordered_map.hpp>
+
 
 class RedisDB {
 public:
@@ -28,9 +32,10 @@ public:
 private:
     std::string _path;
     rocksdb::DB *_kv;
-    rocksdb::DB *_list;
+    rocksdb::DBWithTTL *_list;
     rocksdb::Options options_;
 
+    boost::unordered_map<std::string, std::string> listmeta_;
     port::RecordMutex _mutex_list_record;
 };
 #endif

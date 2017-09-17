@@ -10,17 +10,14 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
     }
 
     rocksdb::Status s;
-    rocksdb::WriteBatch batch;
 
     std::string metakey = "M:" + key;
     std::string metaval;
 
     RecordLock l(&_mutex_list_record, key);
 
-    s = _list->Get(rocksdb::ReadOptions(), metakey, &metaval);
-
-    if (s.ok()) {
-        ListMeta meta(metaval);
+    if (listmeta_.find(metakey) != listmeta_.end()) {
+        ListMeta meta(listmeta_[metakey]);
 
         if (meta.IsElementsFull()) {
             return rocksdb::Status::InvalidArgument("Maximum element size limited: " + std::to_string(meta.Size()));
@@ -51,11 +48,10 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
 
             LOG_DEBUG << "set leaf key: " + leaf;
 
-            batch.Put(metakey, meta.ToString());
-            batch.Put(blockkey, block.ToString());
-            batch.Put(leaf, val);
+            listmeta_[metakey] = meta.ToString();
+            listmeta_[blockkey] = block.ToString();
 
-            s = _list->Write(rocksdb::WriteOptions(), &batch);
+            s = _list->Put(rocksdb::WriteOptions(), leaf, val);
 
             if (s.ok()) *llen = meta.Size();
 
@@ -63,11 +59,12 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
         }
         else {
             std::string blockkey = "B:" + std::to_string(blockptr->addr) + ":" + key;
-            std::string blockval;
 
-            s = _list->Get(rocksdb::ReadOptions(), blockkey, &blockval);
+            if (listmeta_.find(blockkey) == listmeta_.end()) {
+                return rocksdb::Status::Corruption("miss block key");
+            }
 
-            if (!s.ok()) return s;
+            std::string blockval = listmeta_[blockkey];
 
             ListMetaBlock block(blockval);
             block.Insert(0, blockptr->size, meta.AllocArea());
@@ -77,18 +74,17 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
 
             LOG_DEBUG << "set leaf key: " + leaf;
 
-            batch.Put(metakey, meta.ToString());
-            batch.Put(blockkey, block.ToString());
-            batch.Put(leaf, val);
+            listmeta_[metakey] = meta.ToString();
+            listmeta_[blockkey] = block.ToString();
 
-            s = _list->Write(rocksdb::WriteOptions(), &batch);
+            s = _list->Put(rocksdb::WriteOptions(), leaf, val);
 
             if (s.ok()) *llen = meta.Size();
 
             return s;
         }
     }
-    else if (s.IsNotFound()) {
+    else {
         ListMeta meta;
         ListMetaBlockPtr* blockptr = meta.BlockAt(0);
         meta.IncrSize();
@@ -106,18 +102,13 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
 
         LOG_DEBUG << "set leaf key: " + leaf;
 
-        batch.Put(metakey, meta.ToString());
-        batch.Put(blockkey, block.ToString());
-        batch.Put(leaf, val);
+        listmeta_[metakey] = meta.ToString();
+        listmeta_[blockkey] = block.ToString();
 
-        s = _list->Write(rocksdb::WriteOptions(), &batch);
+        s = _list->Put(rocksdb::WriteOptions(), leaf, val);
         if (s.ok()) *llen = meta.Size();
         return s;
     }
-    else {
-        return rocksdb::Status::Corruption("get listmeta error");
-    }
-    return s;
 }
 
 rocksdb::Status RedisDB::LPop(const std::string& key, std::string* val)
