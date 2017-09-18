@@ -1,6 +1,8 @@
 #include "redis_db.h"
 #include "common.h"
 
+#include <fcntl.h>
+
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
@@ -42,6 +44,18 @@ RedisDB::RedisDB(const std::string& path) : _path(path)
     assert(s.ok());
 
     set_ = std::unique_ptr<rocksdb::DBWithTTL>(db);
+
+    LOG_INFO << path + "/meta";
+
+    meta_ = ::open(std::string(path + "/meta").data(), O_CREAT | O_WRONLY | O_APPEND);
+
+    //muduo::Thread appender = ;
 }
 
 RedisDB::~RedisDB() {}
+void RedisDB::AppendMetaLog(const std::string& meta)
+{
+    size_t w = ::write(meta_, meta.data(), meta.size());
+    assert(w = meta.size());
+    fdatasync(meta_);
+}

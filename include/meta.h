@@ -63,7 +63,7 @@ private:
 
 class SetMeta {
 public:
-    SetMeta();
+    SetMeta(const std::string& key);
     ~SetMeta();
     std::string ToString();
 
@@ -73,5 +73,6 @@ public:
 private:
     int64_t size_;
     int64_t limit_;
+    std::string key_;
 };
 #endif

@@ -1,7 +1,10 @@
 #ifndef __REDISDB_H__
 #define __REDISDB_H__
 
+#include <fstream>
+#include <iostream>
 #include <string>
+#include <unordered_map>
 
 #include "mutex.h"
 #include "port.h"
@@ -13,7 +16,7 @@
 #include "rocksdb/slice.h"
 #include "rocksdb/utilities/db_ttl.h"
 
-#include <boost/unordered_map.hpp>
+#include <muduo/base/Thread.h>
 
 class SetMeta;
 
@@ -37,6 +40,8 @@ public:
     rocksdb::Status SAdd(const std::string &key, const std::string &member, int64_t *res);
     rocksdb::Status SCard(const std::string &key, int64_t *res);
 
+    void AppendMetaLog(const std::string &meta);
+
 private:
     std::string _path;
     std::unique_ptr<rocksdb::DBWithTTL> kv_;
@@ -45,10 +50,12 @@ private:
 
     rocksdb::Options options_;
 
-    boost::unordered_map<std::string, std::string> listmeta_;
-    boost::unordered_map<std::string, std::shared_ptr<SetMeta>> setmeta_;
+    std::unordered_map<std::string, std::string> listmeta_;
+    std::unordered_map<std::string, std::shared_ptr<SetMeta>> setmeta_;
 
     port::RecordMutex mutex_list_record_;
     port::RecordMutex mutex_set_record_;
+
+    int meta_;
 };
 #endif

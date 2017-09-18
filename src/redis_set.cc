@@ -16,7 +16,7 @@ rocksdb::Status RedisDB::SAdd(const std::string& key, const std::string& member,
         *res = 1;
 
         if (setmeta_.find(key) == setmeta_.end()) {
-            setmeta_[key] = std::shared_ptr<SetMeta>(new SetMeta());
+            setmeta_[key] = std::shared_ptr<SetMeta>(new SetMeta(key));
         }
 
         std::shared_ptr<SetMeta> meta = setmeta_[key];
@@ -26,8 +26,12 @@ rocksdb::Status RedisDB::SAdd(const std::string& key, const std::string& member,
         }
 
         meta->IncrSize();
+
         s = set_->Put(rocksdb::WriteOptions(), setkey, rocksdb::Slice());
-        return s;
+
+        if (s.ok()) {
+            AppendMetaLog(meta->ToString());
+        }
     }
     else if (s.ok()) {
         *res = 0;
@@ -35,6 +39,8 @@ rocksdb::Status RedisDB::SAdd(const std::string& key, const std::string& member,
     else {
         return rocksdb::Status::Corruption("sadd check member error");
     }
+
+    return s;
 }
 
 rocksdb::Status RedisDB::SCard(const std::string& key, int64_t* res)
