@@ -1,20 +1,17 @@
+#include "redis_list.h"
 #include "common.h"
 #include "meta.h"
 #include "mutex.h"
-#include "redisdb.h"
+#include "redis_db.h"
 
 rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, int64_t* llen)
 {
-    if (key.size() >= KEY_MAX_LENGTH || key.size() <= 0) {
-        return rocksdb::Status::InvalidArgument("Invalid key length");
-    }
-
     rocksdb::Status s;
 
-    std::string metakey = "M:" + key;
+    std::string metakey = EncodeMetaKey(key);
     std::string metaval;
 
-    RecordLock l(&_mutex_list_record, key);
+    RecordLock l(&mutex_list_record_, key);
 
     if (listmeta_.find(metakey) != listmeta_.end()) {
         ListMeta meta(listmeta_[metakey]);
@@ -38,27 +35,27 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
             blockptr->size++;
             blockptr->addr = meta.AllocArea();
 
-            std::string blockkey = "B:" + std::to_string(blockptr->addr) + ":" + key;
+            std::string blockkey = EncodeBlockKey(key, blockptr->addr);
             std::string blockval;
 
             ListMetaBlock block;
             block.addr[0] = meta.AllocArea();
 
-            std::string leaf = "V:" + std::to_string(block.addr[0]) + ":" + key;
+            std::string leaf = EncodeValueKey(key, block.addr[0]);
 
             LOG_DEBUG << "set leaf key: " + leaf;
 
             listmeta_[metakey] = meta.ToString();
             listmeta_[blockkey] = block.ToString();
 
-            s = _list->Put(rocksdb::WriteOptions(), leaf, val);
+            s = list_->Put(rocksdb::WriteOptions(), leaf, val);
 
             if (s.ok()) *llen = meta.Size();
 
             return s;
         }
         else {
-            std::string blockkey = "B:" + std::to_string(blockptr->addr) + ":" + key;
+            std::string blockkey = EncodeBlockKey(key, blockptr->addr);
 
             if (listmeta_.find(blockkey) == listmeta_.end()) {
                 return rocksdb::Status::Corruption("miss block key");
@@ -70,14 +67,14 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
             block.Insert(0, blockptr->size, meta.AllocArea());
             blockptr->size++;
 
-            std::string leaf = "V:" + std::to_string(block.addr[0]) + ":" + key;
+            std::string leaf = EncodeValueKey(key, block.addr[0]);
 
             LOG_DEBUG << "set leaf key: " + leaf;
 
             listmeta_[metakey] = meta.ToString();
             listmeta_[blockkey] = block.ToString();
 
-            s = _list->Put(rocksdb::WriteOptions(), leaf, val);
+            s = list_->Put(rocksdb::WriteOptions(), leaf, val);
 
             if (s.ok()) *llen = meta.Size();
 
@@ -92,20 +89,21 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
         blockptr->addr = meta.AllocArea();
         blockptr->size = 1;
 
-        std::string blockkey = "B:" + std::to_string(blockptr->addr) + ":" + key;
+        std::string blockkey = EncodeBlockKey(key, blockptr->addr);
+
         std::string blockval;
 
         ListMetaBlock block;
         block.addr[0] = meta.AllocArea();
 
-        std::string leaf = "V:" + std::to_string(block.addr[0]) + ":" + key;
+        std::string leaf = EncodeValueKey(key, block.addr[0]);
 
         LOG_DEBUG << "set leaf key: " + leaf;
 
         listmeta_[metakey] = meta.ToString();
         listmeta_[blockkey] = block.ToString();
 
-        s = _list->Put(rocksdb::WriteOptions(), leaf, val);
+        s = list_->Put(rocksdb::WriteOptions(), leaf, val);
         if (s.ok()) *llen = meta.Size();
         return s;
     }
@@ -122,14 +120,14 @@ rocksdb::Status RedisDB::LIndex(const std::string& key, const int64_t index, std
 {
     rocksdb::Status s;
 
-    std::string metakey = "M:" + key;
+    std::string metakey = EncodeMetaKey(key);
     std::string metaval;
 
     int64_t cursor = index;
 
-    RecordLock l(&_mutex_list_record, key);
+    RecordLock l(&mutex_list_record_, key);
 
-    s = _list->Get(rocksdb::ReadOptions(), metakey, &metaval);
+    s = list_->Get(rocksdb::ReadOptions(), metakey, &metaval);
 
     if (s.ok()) {
         ListMeta meta(metaval);
@@ -142,18 +140,18 @@ rocksdb::Status RedisDB::LIndex(const std::string& key, const int64_t index, std
             if (cursor > blockptr->size)
                 cursor -= blockptr->size;
             else {
-                std::string blockkey = "B:" + std::to_string(blockptr->addr) + ":" + key;
+                std::string blockkey = EncodeBlockKey(key, blockptr->addr);
                 std::string blockval;
 
-                s = _list->Get(rocksdb::ReadOptions(), blockkey, &blockval);
+                s = list_->Get(rocksdb::ReadOptions(), blockkey, &blockval);
                 if (!s.ok()) return s;
 
                 ListMetaBlock block(blockval);
 
-                std::string valuekey = "V:" + std::to_string(block.addr[cursor]) + ":" + key;
+                std::string valuekey = EncodeValueKey(key, block.addr[cursor]);
 
                 LOG_DEBUG << "get leaf key: " + valuekey;
-                s = _list->Get(rocksdb::ReadOptions(), valuekey, val);
+                s = list_->Get(rocksdb::ReadOptions(), valuekey, val);
                 return s;
             }
         }

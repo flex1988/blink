@@ -1,6 +1,6 @@
 build_dir := build
 
-obj := $(build_dir)/server.o $(build_dir)/connection.o $(build_dir)/pika.o $(build_dir)/port.o $(build_dir)/command.o $(build_dir)/redisdb.o $(build_dir)/redis_kv.o $(build_dir)/redis_list.o $(build_dir)/redis_list_meta.o
+obj := $(build_dir)/server.o $(build_dir)/connection.o $(build_dir)/pika.o $(build_dir)/port.o $(build_dir)/redis_command.o $(build_dir)/redis_db.o $(build_dir)/redis_kv.o $(build_dir)/redis_list.o $(build_dir)/redis_list_meta.o $(build_dir)/redis_set.o $(build_dir)/redis_set_meta.o
 
 .PHONY: all
 
@@ -8,7 +8,7 @@ all: pika $(obj)
 
 CC := g++
 
-CFLAGS := -g -lmuduo_net -lmuduo_base -lrocksdb -lz -lbz2 -pthread -Iinclude -std=c++11
+CFLAGS := -g -lmuduo_net -lmuduo_base -lrocksdb -lz -lbz2 -pthread -Iinclude -std=c++11 -Wall
 
 pika: $(obj)
 	$(CC) -o build/pika  $(wildcard build/*.o) $(CFLAGS)

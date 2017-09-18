@@ -1,4 +1,4 @@
-#include "redisdb.h"
+#include "redis_db.h"
 #include "common.h"
 
 #include "rocksdb/db.h"
@@ -23,13 +23,25 @@ RedisDB::RedisDB(const std::string& path) : _path(path)
     options_.max_write_buffer_number = 5;
     options_.min_write_buffer_number_to_merge = 2;
 
-    rocksdb::Status s = rocksdb::DB::Open(options_, _path + "/kv", &_kv);
+    rocksdb::DBWithTTL* db;
+
+    rocksdb::Status s = rocksdb::DBWithTTL::Open(options_, _path + "/kv", &db);
     if (!s.ok()) LOG_INFO << s.getState();
     assert(s.ok());
 
-    s = rocksdb::DBWithTTL::Open(options_, _path + "/list", &_list);
+    kv_ = std::unique_ptr<rocksdb::DBWithTTL>(db);
+
+    s = rocksdb::DBWithTTL::Open(options_, _path + "/list", &db);
     if (!s.ok()) LOG_INFO << s.getState();
     assert(s.ok());
+
+    list_ = std::unique_ptr<rocksdb::DBWithTTL>(db);
+
+    s = rocksdb::DBWithTTL::Open(options_, _path + "/set", &db);
+    if (!s.ok()) LOG_INFO << s.getState();
+    assert(s.ok());
+
+    set_ = std::unique_ptr<rocksdb::DBWithTTL>(db);
 }
 
 RedisDB::~RedisDB() {}

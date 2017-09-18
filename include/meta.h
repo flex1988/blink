@@ -61,4 +61,17 @@ private:
     ListMetaBlockPtr* current_block_;
 };
 
+class SetMeta {
+public:
+    SetMeta();
+    ~SetMeta();
+    std::string ToString();
+
+    void IncrSize() { size_++; };
+    int64_t Size() { return size_; };
+    bool IsSetFull() { return size_ == limit_; }
+private:
+    int64_t size_;
+    int64_t limit_;
+};
 #endif

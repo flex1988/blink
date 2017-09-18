@@ -1,6 +1,6 @@
 #include "connection.h"
-#include "command.h"
 #include "common.h"
+#include "redis_command.h"
 #include "server.h"
 
 #include <muduo/base/Logging.h>
@@ -147,7 +147,7 @@ bool Connection::processMultibulkBuffer(muduo::net::Buffer* buf)
             _bulklen = ll;
         }
 
-        if (buf->readableBytes() < _bulklen + 2) {
+        if ((int)buf->readableBytes() < _bulklen + 2) {
             break;
         }
         else {
@@ -182,15 +182,20 @@ bool Connection::processCommand()
 
     boost::algorithm::to_lower(_argv[0]);
 
-    RedisCommand* cmd = CommandDict::lookupCommand(_argv[0]);
+    RedisCommand* cmd = lookupCommand(_argv[0]);
 
     if (!cmd) {
         sendReplyError("unknown command: " + _argv[0]);
         return true;
     }
 
-    if (cmd->argc != _argv.size()) {
+    if (cmd->argc > (int)_argv.size()) {
         sendReplyError("wrong number of arguments");
+        return true;
+    }
+
+    if (_argv.size() > 1 && (_argv[1].size() >= KEY_MAX_LENGTH || _argv[1].size() <= 0)) {
+        sendReplyError("invalid key length");
         return true;
     }
 
