@@ -70,9 +70,13 @@ public:
     void IncrSize() { size_++; };
     int64_t Size() { return size_; };
     bool IsSetFull() { return size_ == limit_; }
+    void BFAdd(const std::string& member);
+    bool BFNotExists(const std::string& member);
+
 private:
     int64_t size_;
     int64_t limit_;
     std::string key_;
+    std::vector<char> bf_;
 };
 #endif

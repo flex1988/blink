@@ -10,34 +10,49 @@ rocksdb::Status RedisDB::SAdd(const std::string& key, const std::string& member,
     std::string setkey = EncodeSetKey(key, member);
     std::string val;
 
-    s = set_->Get(rocksdb::ReadOptions(), setkey, &val);
+    if (setmeta_.find(key) == setmeta_.end()) {
+        setmeta_[key] = std::shared_ptr<SetMeta>(new SetMeta(key));
+    }
 
-    if (s.IsNotFound()) {
+    std::shared_ptr<SetMeta> meta = setmeta_[key];
+
+    if (meta->IsSetFull()) {
+        return rocksdb::Status::InvalidArgument("set if full");
+    }
+
+    if (meta->BFNotExists(member)) {
         *res = 1;
-
-        if (setmeta_.find(key) == setmeta_.end()) {
-            setmeta_[key] = std::shared_ptr<SetMeta>(new SetMeta(key));
-        }
-
-        std::shared_ptr<SetMeta> meta = setmeta_[key];
-
-        if (meta->IsSetFull()) {
-            return rocksdb::Status::InvalidArgument("set if full");
-        }
 
         meta->IncrSize();
 
         s = set_->Put(rocksdb::WriteOptions(), setkey, rocksdb::Slice());
 
         if (s.ok()) {
+            meta->BFAdd(member);
             metaqueue_.push(meta->ToString());
         }
     }
-    else if (s.ok()) {
-        *res = 0;
-    }
     else {
-        return rocksdb::Status::Corruption("sadd check member error");
+        s = set_->Get(rocksdb::ReadOptions(), setkey, &val);
+
+        if (s.IsNotFound()) {
+            *res = 1;
+
+            meta->IncrSize();
+
+            s = set_->Put(rocksdb::WriteOptions(), setkey, rocksdb::Slice());
+
+            if (s.ok()) {
+                meta->BFAdd(member);
+                metaqueue_.push(meta->ToString());
+            }
+        }
+        else if (s.ok()) {
+            *res = 0;
+        }
+        else {
+            return rocksdb::Status::Corruption("sadd check member error");
+        }
     }
 
     return s;

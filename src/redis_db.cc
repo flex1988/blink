@@ -53,10 +53,12 @@ RedisDB::RedisDB(const std::string& path) : _path(path), metaqueue_()
 RedisDB::~RedisDB() {}
 void RedisDB::AppendMetaLog()
 {
+    int64_t loops = 0;
     while (1) {
+        loops++;
         std::string meta = metaqueue_.pop();
         size_t w = ::write(meta_, meta.data(), meta.size());
         assert(w = meta.size());
-        //fdatasync(meta_);
+        //if (loops % 100) fdatasync(meta_);
     }
 }

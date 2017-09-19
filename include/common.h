@@ -16,6 +16,6 @@
 
 #define MAX_LIST_NUMBER 1 << 20
 
-#define SET_MAX_ELEMENT 1 << 20
+#define SET_MAX_ELEMENT 1 << 26
 
 #endif
