@@ -2,6 +2,7 @@
 
 #include <muduo/base/Logging.h>
 #include <string>
+#include <thread>
 
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
@@ -105,6 +106,9 @@ static void sCardCommand(Connection* conn)
 void initRedisCommand(const char* path)
 {
     redisdb_ = boost::shared_ptr<RedisDB>(new RedisDB(std::string(path)));
+
+    std::thread appender(&RedisDB::AppendMetaLog, redisdb_);
+    appender.detach();
 
     commands_["get"] = {"get", getCommand, 0, 2};
     commands_["set"] = {"set", setCommand, 0, 3};

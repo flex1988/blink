@@ -5,6 +5,8 @@
 #include <muduo/net/EventLoopThread.h>
 #include <muduo/net/inspect/Inspector.h>
 
+void test() { LOG_INFO << "hello test"; }
+
 int main(int argc, char** argv)
 {
     const char* path = "/tmp/db";

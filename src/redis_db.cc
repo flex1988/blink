@@ -7,7 +7,7 @@
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
 
-RedisDB::RedisDB(const std::string& path) : _path(path)
+RedisDB::RedisDB(const std::string& path) : _path(path), metaqueue_()
 {
     options_.create_if_missing = true;
     options_.compression = rocksdb::CompressionType::kNoCompression;
@@ -48,14 +48,15 @@ RedisDB::RedisDB(const std::string& path) : _path(path)
     LOG_INFO << path + "/meta";
 
     meta_ = ::open(std::string(path + "/meta").data(), O_CREAT | O_WRONLY | O_APPEND);
-
-    //muduo::Thread appender = ;
 }
 
 RedisDB::~RedisDB() {}
-void RedisDB::AppendMetaLog(const std::string& meta)
+void RedisDB::AppendMetaLog()
 {
-    size_t w = ::write(meta_, meta.data(), meta.size());
-    assert(w = meta.size());
-    fdatasync(meta_);
+    while (1) {
+        std::string meta = metaqueue_.pop();
+        size_t w = ::write(meta_, meta.data(), meta.size());
+        assert(w = meta.size());
+        //fdatasync(meta_);
+    }
 }

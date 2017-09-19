@@ -6,17 +6,15 @@
 #include <string>
 #include <unordered_map>
 
+#include "concurrent_queue.h"
+#include "meta.h"
 #include "mutex.h"
 #include "port.h"
-
-#include "meta.h"
 
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/utilities/db_ttl.h"
-
-#include <muduo/base/Thread.h>
 
 class SetMeta;
 
@@ -40,7 +38,9 @@ public:
     rocksdb::Status SAdd(const std::string &key, const std::string &member, int64_t *res);
     rocksdb::Status SCard(const std::string &key, int64_t *res);
 
-    void AppendMetaLog(const std::string &meta);
+    void AppendMetaLog();
+
+    Queue<std::string> metaqueue_;
 
 private:
     std::string _path;

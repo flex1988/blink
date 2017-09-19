@@ -30,7 +30,7 @@ rocksdb::Status RedisDB::SAdd(const std::string& key, const std::string& member,
         s = set_->Put(rocksdb::WriteOptions(), setkey, rocksdb::Slice());
 
         if (s.ok()) {
-            AppendMetaLog(meta->ToString());
+            metaqueue_.push(meta->ToString());
         }
     }
     else if (s.ok()) {
