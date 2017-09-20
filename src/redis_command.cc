@@ -10,7 +10,7 @@
 
 static boost::unordered_map<std::string, RedisCommand> commands_;
 
-static boost::shared_ptr<RedisDB> redisdb_;
+boost::shared_ptr<RedisDB> redisdb_;
 
 static void getCommand(Connection* conn)
 {

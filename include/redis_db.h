@@ -62,5 +62,8 @@ private:
 
     std::shared_ptr<MetaDB> metadb_;
     int metafd_;
+    uint64_t meta_log_size_;
+
+    std::mutex snap_mutex_;
 };
 #endif

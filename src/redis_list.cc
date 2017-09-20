@@ -16,14 +16,13 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
     if (listmeta_.find(metakey) == listmeta_.end()) {
         listmeta_[metakey] = std::shared_ptr<ListMeta>(new ListMeta());
     }
-
     std::shared_ptr<ListMeta> meta = listmeta_[metakey];
 
     if (meta->IsElementsFull()) {
         return rocksdb::Status::InvalidArgument("Maximum element size limited: " + std::to_string(meta->Size()));
     }
-    meta->IncrSize();
 
+    meta->IncrSize();
     ListMetaBlockPtr* blockptr = meta->BlockAt(0);
 
     if (blockptr->size == LIST_BLOCK_KEYS) {
@@ -56,8 +55,7 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
 
     if (s.ok()) {
         *llen = meta->Size();
-        metaqueue_.push(meta->ToString());
-        metaqueue_.push(block->ToString());
+        metaqueue_.push(meta->ActionBuffer());
     }
 
     return s;

@@ -1,11 +1,12 @@
 #include "redis_command.h"
+#include "redis_db.h"
 #include "server.h"
 
 #include <muduo/net/EventLoop.h>
 #include <muduo/net/EventLoopThread.h>
 #include <muduo/net/inspect/Inspector.h>
 
-void test() { LOG_INFO << "hello test"; }
+extern boost::shared_ptr<RedisDB> redisdb_;
 
 int main(int argc, char** argv)
 {
@@ -16,6 +17,8 @@ int main(int argc, char** argv)
     initRedisCommand(path);
 
     muduo::net::EventLoop loop;
+
+    loop.runEvery(60, boost::bind(&RedisDB::DumpMeta, redisdb_));
 
     Server server(&loop);
 

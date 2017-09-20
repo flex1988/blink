@@ -8,7 +8,19 @@ struct ListMetaBlockPtr {
     int32_t size;  // meta item contain keys
 };
 
-class ListMetaBlock {
+class MetaBase {
+public:
+    enum Action { SIZE, BSIZE, INSERT, ALLOC };
+
+    MetaBase() = default;
+    std::string ActionBuffer();
+    void PushAction(Action action, int16_t op);
+
+private:
+    std::vector<int32_t> action_buffer_;
+};
+
+class ListMetaBlock : public MetaBase {
 public:
     int64_t addr[LIST_BLOCK_KEYS];
 
@@ -33,7 +45,7 @@ public:
     }
 };
 
-class ListMeta {
+class ListMeta : public MetaBase {
 public:
     ListMeta();
     ListMeta(std::string);
@@ -47,8 +59,16 @@ public:
 
     int64_t Size() { return size_; };
     int64_t BSize() { return bsize_; };
-    int64_t IncrSize() { return size_++; };
-    int64_t IncrBSize() { return bsize_++; };
+    int64_t IncrSize()
+    {
+        PushAction(SIZE, ++size_);
+        return size_;
+    };
+    int64_t IncrBSize()
+    {
+        PushAction(BSIZE, ++bsize_);
+        return bsize_;
+    };
     ListMetaBlockPtr* InsertNewMetaBlockPtr(int index);
 
 private:
@@ -57,6 +77,7 @@ private:
     int64_t area_index_;
     int64_t bsize_;
     int64_t blimit_;
+
     ListMetaBlockPtr blocks_[LIST_META_BLOCKS];
 
     int64_t current_block_index_;

@@ -7,20 +7,16 @@
 
 #include <boost/bind.hpp>
 
-Server::Server(muduo::net::EventLoop* loop)
-    : _loop(loop), _server(loop, muduo::net::InetAddress(1234), "pika")
+Server::Server(muduo::net::EventLoop* loop) : _loop(loop), _server(loop, muduo::net::InetAddress(1234), "pika")
 {
     _server.setConnectionCallback(boost::bind(&Server::onConnection, this, _1));
     _server.setThreadNum(2);
+    
 }
 
 Server::~Server() {}
 void Server::start() { _server.start(); }
-void Server::stop()
-{
-    _loop->quit();
-}
-
+void Server::stop() { _loop->quit(); }
 void Server::onConnection(const muduo::net::TcpConnectionPtr& conn)
 {
     if (conn->connected()) {
