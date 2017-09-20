@@ -8,6 +8,7 @@
 
 #include "concurrent_queue.h"
 #include "meta.h"
+#include "meta_db.h"
 #include "mutex.h"
 #include "port.h"
 
@@ -17,6 +18,7 @@
 #include "rocksdb/utilities/db_ttl.h"
 
 class SetMeta;
+class MetaDB;
 
 class RedisDB {
 public:
@@ -38,7 +40,8 @@ public:
     rocksdb::Status SAdd(const std::string &key, const std::string &member, int64_t *res);
     rocksdb::Status SCard(const std::string &key, int64_t *res);
 
-    void AppendMetaLog();
+    void AppendMeta();
+    void DumpMeta();
 
     Queue<std::string> metaqueue_;
 
@@ -50,12 +53,14 @@ private:
 
     rocksdb::Options options_;
 
-    std::unordered_map<std::string, std::string> listmeta_;
+    std::unordered_map<std::string, std::shared_ptr<ListMeta>> listmeta_;
+    std::unordered_map<std::string, std::shared_ptr<ListMetaBlock>> listblock_;
     std::unordered_map<std::string, std::shared_ptr<SetMeta>> setmeta_;
 
     port::RecordMutex mutex_list_record_;
     port::RecordMutex mutex_set_record_;
 
-    int meta_;
+    std::shared_ptr<MetaDB> metadb_;
+    int metafd_;
 };
 #endif

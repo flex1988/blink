@@ -8,7 +8,8 @@ struct ListMetaBlockPtr {
     int32_t size;  // meta item contain keys
 };
 
-struct ListMetaBlock {
+class ListMetaBlock {
+public:
     int64_t addr[LIST_BLOCK_KEYS];
 
     ListMetaBlock() {}
@@ -16,6 +17,7 @@ struct ListMetaBlock {
     std::string ToString()
     {
         std::string str;
+        str.append("LB ", 3);
         str.append((char*)addr, sizeof(int64_t) * LIST_BLOCK_KEYS);
         return str;
     }

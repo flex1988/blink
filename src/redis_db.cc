@@ -1,5 +1,6 @@
 #include "redis_db.h"
 #include "common.h"
+#include "meta_db.h"
 
 #include <fcntl.h>
 
@@ -47,18 +48,25 @@ RedisDB::RedisDB(const std::string& path) : _path(path), metaqueue_()
 
     LOG_INFO << path + "/meta";
 
-    meta_ = ::open(std::string(path + "/meta").data(), O_CREAT | O_WRONLY | O_APPEND);
+    metafd_ = ::open(std::string(path + "/meta").data(), O_CREAT | O_WRONLY | O_APPEND);
+
+    // metadb_ = std::shared_ptr<MetaDB>(new MetaDB(_path + "/meta"));
 }
 
 RedisDB::~RedisDB() {}
-void RedisDB::AppendMetaLog()
+void RedisDB::AppendMeta()
 {
-    int64_t loops = 0;
     while (1) {
-        loops++;
         std::string meta = metaqueue_.pop();
-        size_t w = ::write(meta_, meta.data(), meta.size());
+        size_t w = ::write(metafd_, meta.data(), meta.size());
         assert(w = meta.size());
-        //if (loops % 100) fdatasync(meta_);
+    }
+}
+
+void RedisDB::DumpMeta()
+{
+    
+    for (auto i = listmeta_.begin(); i != listmeta_.end(); ++i) {
+        ;//LOG_INFO << i->first << " : " << i->second;
     }
 }

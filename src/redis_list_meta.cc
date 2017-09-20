@@ -18,6 +18,7 @@ ListMeta::ListMeta(std::string str)
 std::string ListMeta::ToString()
 {
     std::string str;
+    str.append("LM ", 3);
     str.append((char *)&size_, sizeof(int64_t));
     str.append((char *)&limit_, sizeof(int64_t));
     str.append((char *)&bsize_, sizeof(int64_t));

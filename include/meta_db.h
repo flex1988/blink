@@ -11,8 +11,8 @@ public:
     MetaDB(const std::string &path);
     ~MetaDB() = default;
 
-    int Set(const std::string &key, const std::string &val);
-    //Get();
+    fdb_status Set(const std::string &key, const std::string &val);
+    fdb_status Get(const std::string& key, std::string& val);
 
 private:
     std::string path_;

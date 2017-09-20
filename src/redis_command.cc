@@ -1,5 +1,4 @@
 #include "redis_command.h"
-#include "meta_db.h"
 
 #include <muduo/base/Logging.h>
 #include <string>
@@ -12,7 +11,6 @@
 static boost::unordered_map<std::string, RedisCommand> commands_;
 
 static boost::shared_ptr<RedisDB> redisdb_;
-static boost::shared_ptr<MetaDB> metadb_;
 
 static void getCommand(Connection* conn)
 {
@@ -108,9 +106,8 @@ static void sCardCommand(Connection* conn)
 void initRedisCommand(const char* path)
 {
     redisdb_ = boost::shared_ptr<RedisDB>(new RedisDB(std::string(path)));
-    metadb_ = boost::shared_ptr<MetaDB>(new MetaDB(std::string(path)));
 
-    std::thread appender(&RedisDB::AppendMetaLog, redisdb_);
+    std::thread appender(&RedisDB::AppendMeta, redisdb_);
     appender.detach();
 
     commands_["get"] = {"get", getCommand, 0, 2};
