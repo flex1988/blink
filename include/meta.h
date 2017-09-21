@@ -7,32 +7,35 @@ struct ListMetaBlockPtr {
     int32_t addr;  // meta item address
     int32_t size;  // meta item contain keys
 };
+enum Action { NEWLIST, UNIQUE, SIZE, BSIZE, INSERT, ALLOC };
 
 class MetaBase {
 public:
-    enum Action { SIZE, BSIZE, INSERT, ALLOC };
-
     MetaBase() = default;
     std::string ActionBuffer();
     void PushAction(Action action, int16_t op);
 
+    virtual int64_t Size() { return 0; };
+    virtual int64_t IncrSize() { return 0; };
+    virtual std::string ToString() { return NULL; };
+    virtual void SetUnique(std::string unique)
+    {
+        PushAction(UNIQUE, 0);
+        unique_ = unique;
+    };
+    virtual std::string GetUnique() { return unique_; };
 private:
     std::vector<int32_t> action_buffer_;
+    std::string unique_;
 };
 
 class ListMetaBlock : public MetaBase {
 public:
     int64_t addr[LIST_BLOCK_KEYS];
 
-    ListMetaBlock() {}
+    ListMetaBlock() { std::memset(addr, 0, sizeof(int64_t) * LIST_BLOCK_KEYS); }
     ListMetaBlock(const std::string& str) { str.copy((char*)addr, sizeof(int64_t) * LIST_BLOCK_KEYS); }
-    std::string ToString()
-    {
-        std::string str;
-        str.append("LB ", 3);
-        str.append((char*)addr, sizeof(int64_t) * LIST_BLOCK_KEYS);
-        return str;
-    }
+    std::string ToString();
 
     void Insert(int index, int size, int val)
     {
@@ -48,7 +51,7 @@ public:
 class ListMeta : public MetaBase {
 public:
     ListMeta();
-    ListMeta(std::string);
+    ListMeta(const std::string&);
     std::string ToString();
     ListMetaBlockPtr* BlockAt(int);
     int AllocArea();
@@ -84,13 +87,13 @@ private:
     ListMetaBlockPtr* current_block_;
 };
 
-class SetMeta {
+class SetMeta : public MetaBase {
 public:
     SetMeta(const std::string& key);
     ~SetMeta();
     std::string ToString();
 
-    void IncrSize() { size_++; };
+    int64_t IncrSize() { return size_++; };
     int64_t Size() { return size_; };
     bool IsSetFull() { return size_ == limit_; }
     void BFAdd(const std::string& member);

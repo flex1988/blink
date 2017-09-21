@@ -41,6 +41,7 @@ public:
 
     void AppendMeta();
     void DumpMeta();
+    void LoadMeta();
 
     Queue<std::string> metaqueue_;
 
@@ -56,13 +57,21 @@ private:
     std::unordered_map<std::string, std::shared_ptr<ListMetaBlock>> listblock_;
     std::unordered_map<std::string, std::shared_ptr<SetMeta>> setmeta_;
 
+    std::unordered_map<std::string, std::shared_ptr<MetaBase>> memmeta_;
+
     port::RecordMutex mutex_list_record_;
     port::RecordMutex mutex_set_record_;
 
-    //std::shared_ptr<MetaDB> metadb_;
+    void loadMetaSnapshot();
+    void loadMetaLog();
+
     int metafd_;
     uint64_t meta_log_size_;
 
     std::mutex snap_mutex_;
+
+    std::string msnap_;
+    std::string mnewsnap_;
+    std::string mlog_;
 };
 #endif

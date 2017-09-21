@@ -3,6 +3,8 @@
 #include <assert.h>
 #include <muduo/base/Logging.h>
 
+#include <cstring>
+
 #include "rocksdb/db.h"
 #include "rocksdb/utilities/db_ttl.h"
 

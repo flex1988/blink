@@ -7,14 +7,15 @@ rocksdb::Status RedisDB::SAdd(const std::string& key, const std::string& member,
     rocksdb::Status s;
     RecordLock l(&mutex_set_record_, key);
 
-    std::string setkey = EncodeSetKey(key, member);
-    std::string val;
+    std::string setkey = EncodeSetKey(key);
 
-    if (setmeta_.find(key) == setmeta_.end()) {
-        setmeta_[key] = std::shared_ptr<SetMeta>(new SetMeta(key));
+    if (memmeta_.find(setkey) == memmeta_.end()) {
+        memmeta_[setkey] = std::shared_ptr<MetaBase>(new SetMeta(setkey));
     }
+    std::shared_ptr<SetMeta> meta = std::dynamic_pointer_cast<SetMeta>(memmeta_[setkey]);
 
-    std::shared_ptr<SetMeta> meta = setmeta_[key];
+    std::string memberkey = EncodeMemberKey(key, member);
+    std::string val;
 
     if (meta->IsSetFull()) {
         return rocksdb::Status::InvalidArgument("set if full");
@@ -25,7 +26,7 @@ rocksdb::Status RedisDB::SAdd(const std::string& key, const std::string& member,
 
         meta->IncrSize();
 
-        s = set_->Put(rocksdb::WriteOptions(), setkey, rocksdb::Slice());
+        s = set_->Put(rocksdb::WriteOptions(), memberkey, rocksdb::Slice());
 
         if (s.ok()) {
             meta->BFAdd(member);
@@ -33,14 +34,14 @@ rocksdb::Status RedisDB::SAdd(const std::string& key, const std::string& member,
         }
     }
     else {
-        s = set_->Get(rocksdb::ReadOptions(), setkey, &val);
+        s = set_->Get(rocksdb::ReadOptions(), memberkey, &val);
 
         if (s.IsNotFound()) {
             *res = 1;
 
             meta->IncrSize();
 
-            s = set_->Put(rocksdb::WriteOptions(), setkey, rocksdb::Slice());
+            s = set_->Put(rocksdb::WriteOptions(), memberkey, rocksdb::Slice());
 
             if (s.ok()) {
                 meta->BFAdd(member);
@@ -60,11 +61,13 @@ rocksdb::Status RedisDB::SAdd(const std::string& key, const std::string& member,
 
 rocksdb::Status RedisDB::SCard(const std::string& key, int64_t* res)
 {
-    if (setmeta_.find(key) == setmeta_.end()) {
+    std::string setkey = EncodeSetKey(key);
+
+    if (memmeta_.find(setkey) == memmeta_.end()) {
         *res = 0;
     }
     else {
-        *res = setmeta_[key]->Size();
+        *res = memmeta_[setkey]->Size();
     }
 
     return rocksdb::Status::OK();

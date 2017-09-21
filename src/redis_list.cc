@@ -4,6 +4,8 @@
 #include "mutex.h"
 #include "redis_db.h"
 
+#include <memory>
+
 rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, int64_t* llen)
 {
     rocksdb::Status s;
@@ -13,10 +15,11 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
 
     RecordLock l(&mutex_list_record_, key);
 
-    if (listmeta_.find(metakey) == listmeta_.end()) {
-        listmeta_[metakey] = std::shared_ptr<ListMeta>(new ListMeta());
+    if (memmeta_.find(metakey) == memmeta_.end()) {
+        memmeta_[metakey] = std::shared_ptr<MetaBase>(new ListMeta());
+        memmeta_[metakey]->SetUnique(key);
     }
-    std::shared_ptr<ListMeta> meta = listmeta_[metakey];
+    std::shared_ptr<ListMeta> meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
 
     if (meta->IsElementsFull()) {
         return rocksdb::Status::InvalidArgument("Maximum element size limited: " + std::to_string(meta->Size()));
@@ -79,11 +82,11 @@ rocksdb::Status RedisDB::LIndex(const std::string& key, const int64_t index, std
 
     RecordLock l(&mutex_list_record_, key);
 
-    if (listmeta_.find(metakey) == listmeta_.end()) {
+    if (memmeta_.find(metakey) == memmeta_.end()) {
         return rocksdb::Status::InvalidArgument("list meta not exists");
     }
 
-    std::shared_ptr<ListMeta> meta = listmeta_[metakey];
+    std::shared_ptr<ListMeta> meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
 
     if (cursor < 0) cursor = meta->Size() + cursor;
     if (cursor >= meta->Size()) return rocksdb::Status::InvalidArgument("outof list index");
