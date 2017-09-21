@@ -8,7 +8,6 @@
 
 #include "concurrent_queue.h"
 #include "meta.h"
-#include "meta_db.h"
 #include "mutex.h"
 #include "port.h"
 
@@ -18,7 +17,6 @@
 #include "rocksdb/utilities/db_ttl.h"
 
 class SetMeta;
-class MetaDB;
 
 class RedisDB {
 public:
