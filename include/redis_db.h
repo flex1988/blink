@@ -59,7 +59,7 @@ private:
     port::RecordMutex mutex_list_record_;
     port::RecordMutex mutex_set_record_;
 
-    std::shared_ptr<MetaDB> metadb_;
+    //std::shared_ptr<MetaDB> metadb_;
     int metafd_;
     uint64_t meta_log_size_;
 
