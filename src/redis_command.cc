@@ -10,7 +10,7 @@
 
 static boost::unordered_map<std::string, RedisCommand> commands_;
 
-boost::shared_ptr<RedisDB> redisdb_;
+std::shared_ptr<RedisDB> redisdb_;
 
 static void getCommand(Connection* conn)
 {
@@ -103,9 +103,9 @@ static void sCardCommand(Connection* conn)
     conn->sendReplyLongLong(ret);
 }
 
-void initRedisCommand(const char* path)
+void initRedisCommand(std::shared_ptr<RedisDB> db)
 {
-    redisdb_ = boost::shared_ptr<RedisDB>(new RedisDB(std::string(path)));
+    redisdb_ = db;
 
     std::thread appender(&RedisDB::AppendMeta, redisdb_);
     appender.detach();

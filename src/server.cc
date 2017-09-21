@@ -1,5 +1,6 @@
 #include "server.h"
 #include "connection.h"
+#include "redis_db.h"
 
 #include <muduo/base/Atomic.h>
 #include <muduo/base/Logging.h>
@@ -7,11 +8,12 @@
 
 #include <boost/bind.hpp>
 
-Server::Server(muduo::net::EventLoop* loop) : _loop(loop), _server(loop, muduo::net::InetAddress(1234), "pika")
+Server::Server(muduo::net::EventLoop* loop, std::string path) : _loop(loop), _server(loop, muduo::net::InetAddress(1234), "pika")
 {
     _server.setConnectionCallback(boost::bind(&Server::onConnection, this, _1));
     _server.setThreadNum(2);
-    
+
+    db = std::shared_ptr<RedisDB>(new RedisDB(std::string(path)));
 }
 
 Server::~Server() {}

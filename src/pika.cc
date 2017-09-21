@@ -6,23 +6,21 @@
 #include <muduo/net/EventLoopThread.h>
 #include <muduo/net/inspect/Inspector.h>
 
-extern boost::shared_ptr<RedisDB> redisdb_;
-
 int main(int argc, char** argv)
 {
-    const char* path = "/tmp/db";
+    std::string dbpath = "/tmp/db";
 
-    if (argc >= 2) path = argv[1];
-
-    initRedisCommand(path);
+    if (argc >= 2) dbpath = std::string(argv[1]);
 
     muduo::net::EventLoop loop;
 
-    loop.runEvery(60, boost::bind(&RedisDB::DumpMeta, redisdb_));
-
-    Server server(&loop);
+    Server server(&loop, dbpath);
 
     server.start();
+
+    loop.runEvery(60, boost::bind(&RedisDB::DumpMeta, server.db));
+
+    initRedisCommand(server.db);
 
     loop.loop();
 

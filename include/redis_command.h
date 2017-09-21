@@ -13,7 +13,7 @@ struct RedisCommand {
     int argc;
 };
 
-void initRedisCommand(const char *);
+void initRedisCommand(std::shared_ptr<RedisDB> db);
 
 RedisCommand* lookupCommand(std::string cmd);
 #endif

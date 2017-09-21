@@ -25,6 +25,7 @@ public:
     RedisDB(const std::string &path);
     ~RedisDB();
 
+    enum CommitMode { SYNC, ASYNC };
     // Status Del(const std::string &key, int64_t *count);
     // Status Set(const std::string &key, const std::string &val,
     // const int32_t ttl = 0);

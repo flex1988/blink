@@ -47,19 +47,19 @@ RedisDB::RedisDB(const std::string& path) : _path(path), metaqueue_(), meta_log_
 
     set_ = std::unique_ptr<rocksdb::DBWithTTL>(db);
 
-    LOG_INFO << path + "/meta";
+    LOG_INFO << "Server now is ready to accept connection";
+    LOG_INFO << "DB path: " + path + "/meta";
 
     metafd_ = ::open(std::string(path + "/meta.log").data(), O_CREAT | O_WRONLY | O_APPEND);
-
-    // metadb_ = std::shared_ptr<MetaDB>(new MetaDB(_path + "/meta"));
 }
 
 RedisDB::~RedisDB() {}
 void RedisDB::AppendMeta()
 {
     while (1) {
-        std::string meta = metaqueue_.pop();
         snap_mutex_.lock();
+        std::string meta = metaqueue_.pop();
+        
         size_t w = ::write(metafd_, meta.data(), meta.size());
         assert(w = meta.size());
         meta_log_size_ += w;
