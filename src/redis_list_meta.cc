@@ -1,7 +1,6 @@
 #include "common.h"
 #include "meta.h"
 
-void MetaBase::PushAction(Action action, int16_t op) { action_buffer_.push_back(action << 16 | op); }
 std::string MetaBase::ActionBuffer()
 {
     std::string buf;
@@ -11,11 +10,28 @@ std::string MetaBase::ActionBuffer()
     return buf;
 }
 
-ListMeta::ListMeta() : size_(0), area_index_(0), limit_(LIST_ELEMENT_SIZE), bsize_(0), blimit_(LIST_META_BLOCKS)
+void MetaBase::PushAction(Action action, int16_t op, const std::string& str)
+{
+    action_buffer_.push_back(action << 16 | op);
+
+    if (str.empty()) return;
+
+    for (size_t i = 0; i < str.size(); i += 4) {
+        action_buffer_.push_back(*(int32_t*)&str.at(i));
+    }
+}
+
+void MetaBase::SetUnique(std::string unique)
+{
+    assert(unique.size() > 0);
+    PushAction(UNIQUE, unique.size(), unique);
+    unique_ = unique;
+}
+
+ListMeta::ListMeta() : size_(0), limit_(LIST_ELEMENT_SIZE), bsize_(0), blimit_(LIST_META_BLOCKS), area_index_(0)
 {
     std::memset(blocks_, 0, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS);
-
-    PushAction(NEWLIST, 0);
+    PushAction(NEWLIST, 0, "");
 }
 
 ListMeta::ListMeta(const std::string& str)
@@ -53,7 +69,7 @@ std::string ListMeta::ToString()
 ListMetaBlockPtr* ListMeta::BlockAt(int index) { return &blocks_[index]; }
 int ListMeta::AllocArea()
 {
-    PushAction(ALLOC, area_index_ + 1);
+    PushAction(ALLOC, area_index_ + 1, "");
     return area_index_++;
 }
 int ListMeta::CurrentArea() { return area_index_; }
@@ -69,7 +85,7 @@ ListMetaBlockPtr* ListMeta::InsertNewMetaBlockPtr(int index)
         return NULL;
     }
 
-    PushAction(INSERT, static_cast<int16_t>(index));
+    PushAction(INSERT, static_cast<int16_t>(index), "");
 
     int cursor = bsize_;
     while (cursor > index) {

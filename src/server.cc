@@ -8,7 +8,7 @@
 
 #include <boost/bind.hpp>
 
-Server::Server(muduo::net::EventLoop* loop, std::string path) : _loop(loop), _server(loop, muduo::net::InetAddress(1234), "pika")
+Server::Server(muduo::net::EventLoop* loop, std::string path) : _server(loop, muduo::net::InetAddress(1234), "pika"), _loop(loop)
 {
     _server.setConnectionCallback(boost::bind(&Server::onConnection, this, _1));
     _server.setThreadNum(2);

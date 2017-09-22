@@ -40,13 +40,13 @@ public:
     rocksdb::Status SCard(const std::string &key, int64_t *res);
 
     void AppendMeta();
-    void DumpMeta();
+    void CompactMeta();
     void LoadMeta();
 
     Queue<std::string> metaqueue_;
 
 private:
-    std::string _path;
+    std::string path_;
     std::unique_ptr<rocksdb::DBWithTTL> kv_;
     std::unique_ptr<rocksdb::DBWithTTL> list_;
     std::unique_ptr<rocksdb::DBWithTTL> set_;

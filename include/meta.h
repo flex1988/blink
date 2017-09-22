@@ -7,22 +7,20 @@ struct ListMetaBlockPtr {
     int32_t addr;  // meta item address
     int32_t size;  // meta item contain keys
 };
-enum Action { NEWLIST, UNIQUE, SIZE, BSIZE, INSERT, ALLOC };
+
+enum Action { DEFAULT, NEWLIST, UNIQUE, SIZE, BSIZE, INSERT, ALLOC };
 
 class MetaBase {
 public:
     MetaBase() = default;
     std::string ActionBuffer();
-    void PushAction(Action action, int16_t op);
+    void PushAction(Action action, int16_t op, const std::string& str);
 
     virtual int64_t Size() { return 0; };
     virtual int64_t IncrSize() { return 0; };
     virtual std::string ToString() { return NULL; };
-    virtual void SetUnique(std::string unique)
-    {
-        PushAction(UNIQUE, 0);
-        unique_ = unique;
-    };
+    virtual void SetUnique(std::string unique);
+    
     virtual std::string GetUnique() { return unique_; };
 private:
     std::vector<int32_t> action_buffer_;
@@ -64,12 +62,12 @@ public:
     int64_t BSize() { return bsize_; };
     int64_t IncrSize()
     {
-        PushAction(SIZE, ++size_);
+        PushAction(SIZE, ++size_, "");
         return size_;
     };
     int64_t IncrBSize()
     {
-        PushAction(BSIZE, ++bsize_);
+        PushAction(BSIZE, ++bsize_, "");
         return bsize_;
     };
     ListMetaBlockPtr* InsertNewMetaBlockPtr(int index);
@@ -77,9 +75,11 @@ public:
 private:
     int64_t size_;
     int64_t limit_;
-    int64_t area_index_;
+
     int64_t bsize_;
     int64_t blimit_;
+
+    int64_t area_index_;
 
     ListMetaBlockPtr blocks_[LIST_META_BLOCKS];
 

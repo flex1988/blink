@@ -12,7 +12,7 @@
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
 
-RedisDB::RedisDB(const std::string& path) : _path(path), metaqueue_(), meta_log_size_(0)
+RedisDB::RedisDB(const std::string& path) : metaqueue_(), path_(path), meta_log_size_(0)
 {
     options_.create_if_missing = true;
     options_.compression = rocksdb::CompressionType::kNoCompression;
@@ -32,30 +32,30 @@ RedisDB::RedisDB(const std::string& path) : _path(path), metaqueue_(), meta_log_
 
     rocksdb::DBWithTTL* db;
 
-    rocksdb::Status s = rocksdb::DBWithTTL::Open(options_, _path + "/kv", &db);
+    rocksdb::Status s = rocksdb::DBWithTTL::Open(options_, path_ + "/kv", &db);
     if (!s.ok()) LOG_INFO << s.getState();
     assert(s.ok());
 
     kv_ = std::unique_ptr<rocksdb::DBWithTTL>(db);
 
-    s = rocksdb::DBWithTTL::Open(options_, _path + "/list", &db);
+    s = rocksdb::DBWithTTL::Open(options_, path_ + "/list", &db);
     if (!s.ok()) LOG_INFO << s.getState();
     assert(s.ok());
 
     list_ = std::unique_ptr<rocksdb::DBWithTTL>(db);
 
-    s = rocksdb::DBWithTTL::Open(options_, _path + "/set", &db);
+    s = rocksdb::DBWithTTL::Open(options_, path_ + "/set", &db);
     if (!s.ok()) LOG_INFO << s.getState();
     assert(s.ok());
 
     set_ = std::unique_ptr<rocksdb::DBWithTTL>(db);
 
-    msnap_ = _path + "/meta.snapshot";
-    mnewsnap_ = _path + "/meta.snapshot.new";
-    mlog_ = _path + "/meta.log";
+    msnap_ = path_ + "/meta.snapshot";
+    mnewsnap_ = path_ + "/meta.snapshot.new";
+    mlog_ = path_ + "/meta.log";
 
     LOG_INFO << "Server now is ready to accept connection";
-    LOG_INFO << "DB path: " + _path + "/meta";
+    LOG_INFO << "DB path: " + path_ + "/meta";
 
     LoadMeta();
 
@@ -75,7 +75,7 @@ void RedisDB::AppendMeta()
 
 void RedisDB::LoadMeta()
 {
-    LOG_INFO << "Load meta info form disk file path: " + _path + "/meta";
+    LOG_INFO << "Load meta info form disk file path: " + path_ + "/meta";
     loadMetaSnapshot();
     loadMetaLog();
 }
@@ -106,41 +106,69 @@ void RedisDB::loadMetaSnapshot()
 void RedisDB::loadMetaLog()
 {
     LOG_INFO << "load meta log from disk";
-    std::ifstream mlog(mlog_);
+    std::ifstream mlog(mlog_, std::ifstream::in);
     if (!mlog.is_open()) {
         LOG_INFO << "open meta log failed!";
         return;
     }
 
     for (std::string line; std::getline(mlog, line);) {
-        LOG_INFO << line;
-        int ops = line.size() / sizeof(uint32_t);
-        int n = 0;
-        while (n < ops) {
-            uint32_t p = static_cast<uint32_t>(line.at(n * sizeof(uint32_t)));
-            uint16_t action = p >> 16;
-            uint16_t op = p << 16;
+        LOG_INFO << "line size: " << line.size();
+        if (line.empty()) break;
+
+        size_t index = 0;
+
+        while (1) {
+            if (index > line.size() - 1 || line.at(index) == '\r') break;
+
+            int32_t p = *(int32_t*)&line.at(index);
+
+            int16_t action = p >> 16;
+            int16_t op = p & 0x0000ffff;
 
             switch (action) {
                 case NEWLIST:
                     LOG_INFO << "new list";
+                    index += 4;
+                    break;
                 case SIZE:
                     LOG_INFO << "size";
+                    index += 4;
+                    break;
+                case UNIQUE: {
+                    index += 4;
+                    std::string unique = line.substr(index, op);
+                    assert(op > 0);
+                    op = op < 4 ? 4 : op;
+                    index += op;
+                    break;
+                }
+                case ALLOC:
+                    LOG_INFO << "alloc";
+                    index += 4;
+                    break;
+                case BSIZE:
+                    LOG_INFO << "bsize";
+                    index += 4;
+                    break;
+                case INSERT:
+                    LOG_INFO << "insert";
+                    index += 4;
+                    break;
                 default:
-                    LOG_INFO << "unknown";
-                    LOG_INFO << p;
+                    LOG_INFO << "unknown action: " << action;
+                    index += line.size();
+                    break;
             }
-
-            n++;
         }
     }
 }
 
-void RedisDB::DumpMeta()
+void RedisDB::CompactMeta()
 {
     LOG_INFO << "Dump meta to disk!";
 
-    uint64_t truncate_size = meta_log_size_;
+    // uint64_t truncate_size = meta_log_size_;
     meta_log_size_ = 0;
 
     int ret;
