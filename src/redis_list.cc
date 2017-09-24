@@ -16,8 +16,7 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
     RecordLock l(&mutex_list_record_, key);
 
     if (memmeta_.find(metakey) == memmeta_.end()) {
-        memmeta_[metakey] = std::shared_ptr<MetaBase>(new ListMeta());
-        memmeta_[metakey]->SetUnique(key);
+        memmeta_[metakey] = std::shared_ptr<MetaBase>(new ListMeta(key, INIT));
     }
     std::shared_ptr<ListMeta> meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
 

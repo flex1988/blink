@@ -1,52 +1,36 @@
 #include "common.h"
 #include "meta.h"
 
-std::string MetaBase::ActionBuffer()
+ListMeta::ListMeta(const std::string& str, Action action)
 {
-    std::string buf;
-    buf.append((char*)&action_buffer_.at(0), sizeof(int32_t) * action_buffer_.size());
-    buf.append("\r\n", 2);
-    action_buffer_.clear();
-    return buf;
-}
+    SetType(LIST);
+    pushActionHeader();
 
-void MetaBase::PushAction(Action action, int16_t op, const std::string& str)
-{
-    action_buffer_.push_back(action << 16 | op);
+    if (action == REINIT) {
+        assert(str.at(0) == 'L');
+        uint8_t klen = (int8_t)str.at(1);
+        assert(klen < str.size() - 2);
 
-    if (str.empty()) return;
-
-    for (size_t i = 0; i < str.size(); i += 4) {
-        action_buffer_.push_back(*(int32_t*)&str.at(i));
+        SetUnique(str.substr(2, klen));
+        size_ = *(int64_t*)&str.at(klen + 2);
+        limit_ = *(int64_t*)&str.at(sizeof(int64_t) + klen + 2);
+        bsize_ = *(int64_t*)&str.at(sizeof(int64_t) * 2 + klen + 2);
+        blimit_ = *(int64_t*)&str.at(sizeof(int64_t) * 3 + klen + 2);
+        area_index_ = *(int64_t*)&str.at(sizeof(int64_t) * 4 + klen + 2);
+        str.copy((char*)blocks_, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS, 42 + klen);
     }
-}
+    else if (action == INIT) {
+        size_ = 0;
+        limit_ = LIST_ELEMENT_SIZE;
+        bsize_ = 0;
+        blimit_ = LIST_META_BLOCKS;
+        area_index_ = 0;
 
-void MetaBase::SetUnique(std::string unique)
-{
-    assert(unique.size() > 0);
-    PushAction(UNIQUE, unique.size(), unique);
-    unique_ = unique;
-}
+        SetUnique(str);
+        std::memset(blocks_, 0, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS);
+    }
 
-ListMeta::ListMeta() : size_(0), limit_(LIST_ELEMENT_SIZE), bsize_(0), blimit_(LIST_META_BLOCKS), area_index_(0)
-{
-    std::memset(blocks_, 0, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS);
-    PushAction(NEWLIST, 0, "");
-}
-
-ListMeta::ListMeta(const std::string& str)
-{
-    assert(str.at(0) == 'L');
-    uint8_t klen = (int8_t)str.at(1);
-    assert(klen < str.size() - 2);
-    SetUnique(str.substr(2, klen));
-
-    size_ = *(int64_t*)&str.at(klen + 2);
-    limit_ = *(int64_t*)&str.at(sizeof(int64_t) + klen + 2);
-    bsize_ = *(int64_t*)&str.at(sizeof(int64_t) * 2 + klen + 2);
-    blimit_ = *(int64_t*)&str.at(sizeof(int64_t) * 3 + klen + 2);
-    area_index_ = *(int64_t*)&str.at(sizeof(int64_t) * 4 + klen + 2);
-    str.copy((char*)blocks_, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS, 42 + klen);
+    PushAction(action, str.size(), str);
 }
 
 std::string ListMeta::ToString()
@@ -109,12 +93,3 @@ std::string ListMetaBlock::ToString()
     str.append((char*)addr, sizeof(int64_t) * LIST_BLOCK_KEYS);
     return str;
 }
-// void ListMeta::pushAction(Action action, int16_t op) { action_buffer_.push_back(action << 16 | op); }
-// std::string ListMeta::ActionBuffer()
-//{
-// std::string buf;
-// buf.append((char*)&action_buffer_.at(0), sizeof(int32_t) * action_buffer_.size());
-// buf.append("\r\n", 2);
-// action_buffer_.clear();
-// return buf;
-//}

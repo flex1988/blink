@@ -1,6 +1,7 @@
 #include "redis_db.h"
 #include "common.h"
 #include "meta.h"
+#include "redis_list.h"
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -11,6 +12,43 @@
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
+
+static size_t readSync(int fd, char* buffer, size_t nread)
+{
+    size_t n;
+    size_t last = nread;
+    for (;;) {
+        if (last == 0) return nread;
+        n = read(fd, buffer, last);
+        if (n < 0) {
+            return n;
+        }
+        else if (n == 0) {
+            return nread - last;
+        }
+        else {
+            last -= n;
+            buffer += n;
+        }
+    }
+}
+
+static size_t readNextChar(int fd, char* buffer, char target)
+{
+    size_t nread = 0;
+    size_t n;
+    for (;;) {
+        n = read(fd, buffer, 1);
+
+        if (n == -1 || n == 0) return n;
+
+        nread++;
+
+        if (buffer[0] == target) {
+            return nread;
+        }
+    }
+}
 
 RedisDB::RedisDB(const std::string& path) : metaqueue_(), path_(path), meta_log_size_(0)
 {
@@ -82,13 +120,12 @@ void RedisDB::LoadMeta()
 
 void RedisDB::loadMetaSnapshot()
 {
-    LOG_INFO << "load meta snapshot from disk";
     std::ifstream snap(msnap_);
 
     for (std::string line; std::getline(snap, line);) {
         switch (line.at(0)) {
             case 'L': {
-                std::shared_ptr<ListMeta> meta = std::shared_ptr<ListMeta>(new ListMeta(line));
+                std::shared_ptr<ListMeta> meta = std::shared_ptr<ListMeta>(new ListMeta(line, REINIT));
                 LOG_INFO << "Key: " << meta->GetUnique();
                 LOG_INFO << "Size: " << meta->Size();
                 memmeta_[meta->GetUnique()] = std::dynamic_pointer_cast<MetaBase>(meta);
@@ -101,65 +138,72 @@ void RedisDB::loadMetaSnapshot()
                 LOG_INFO << "unknown meta info!";
         }
     }
+
+    LOG_INFO << "load meta snapshot success";
 }
 
 void RedisDB::loadMetaLog()
 {
-    LOG_INFO << "load meta log from disk";
-    std::ifstream mlog(mlog_, std::ifstream::in);
-    if (!mlog.is_open()) {
-        LOG_INFO << "open meta log failed!";
+    int fd = ::open(mlog_.c_str(), O_RDONLY);
+    if (fd < 0) {
+        LOG_INFO << "open meta log not exists!";
         return;
     }
 
-    for (std::string line; std::getline(mlog, line);) {
-        LOG_INFO << "line size: " << line.size();
-        if (line.empty()) break;
+    char buffer[2048];
+    uint8_t msize;
+    size_t ret;
+    MetaType type;
 
-        size_t index = 0;
+    int load = 0;
 
-        while (1) {
-            if (index > line.size() - 1 || line.at(index) == '\r') break;
+    for (;;) {
+    header:
+        ret = readNextChar(fd, buffer, ACTION_BUFFER_MAGIC);
+        if (ret == 0 || ret == -1) {
+            LOG_INFO << "load meta log from disk success: " << load;
+            return;
+        }
 
-            int32_t p = *(int32_t*)&line.at(index);
+        ret = readSync(fd, buffer, 2);
 
-            int16_t action = p >> 16;
-            int16_t op = p & 0x0000ffff;
+        if (ret == 0) {
+            LOG_INFO << "load meta log from disk success";
+            return;
+        }
 
-            switch (action) {
-                case NEWLIST:
-                    LOG_INFO << "new list";
-                    index += 4;
-                    break;
-                case SIZE:
-                    LOG_INFO << "size";
-                    index += 4;
-                    break;
-                case UNIQUE: {
-                    index += 4;
-                    std::string unique = line.substr(index, op);
-                    assert(op > 0);
-                    op = op < 4 ? 4 : op;
-                    index += op;
-                    break;
-                }
-                case ALLOC:
-                    LOG_INFO << "alloc";
-                    index += 4;
-                    break;
-                case BSIZE:
-                    LOG_INFO << "bsize";
-                    index += 4;
-                    break;
-                case INSERT:
-                    LOG_INFO << "insert";
-                    index += 4;
-                    break;
-                default:
-                    LOG_INFO << "unknown action: " << action;
-                    index += line.size();
-                    break;
-            }
+        if (ret == -1) {
+            LOG_INFO << "read meta log header failed " << std::string(strerror(errno));
+            return;
+        }
+
+        if (ret < 2) {
+            LOG_INFO << "meta log may lose data";
+            return;
+        }
+
+        type = static_cast<MetaType>(*buffer);
+        msize = *(uint8_t*)(buffer + 1);
+
+        if (msize == 0) goto header;
+
+        ret = readSync(fd, buffer, msize + 2);
+
+        if (ret == -1) {
+            LOG_INFO << "read meta log body failed " << std::string(strerror(errno));
+            return;
+        }
+
+        if (ret < msize + 2) {
+            LOG_INFO << "meta log may lose data";
+            return;
+        }
+
+        load++;
+
+        switch (type) {
+            case LIST:
+                reloadListActionBuffer(buffer, ret - 2);
         }
     }
 }
@@ -193,5 +237,52 @@ void RedisDB::CompactMeta()
     if (ret == -1) {
         LOG_INFO << std::string(strerror(errno));
         assert(0);
+    }
+}
+
+void RedisDB::reloadListActionBuffer(char* buf, size_t blen)
+{
+    size_t index = 0;
+    std::shared_ptr<ListMeta> meta;
+
+    while (index < blen) {
+        int16_t action = *(int16_t*)(buf + index);
+        int16_t op = *(int16_t*)(buf + index + 2);
+
+        index += 4;
+
+        switch (action) {
+            case INIT: {
+                std::string key = std::string(buf + index, op);
+                std::string metakey = EncodeMetaKey(key);
+                meta = std::shared_ptr<ListMeta>(new ListMeta(key, INIT));
+                memmeta_[metakey] = std::dynamic_pointer_cast<MetaBase>(meta);
+                index += op;
+                break;
+            }
+            case REINIT: {
+                std::string key = std::string(buf + index, op);
+                std::string metakey = EncodeMetaKey(key);
+                assert(memmeta_.find(metakey) != memmeta_.end());
+                meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
+                index += op;
+                break;
+            }
+            case SIZE:
+                meta->SetSize(op);
+                break;
+            case ALLOC:
+                meta->AllocArea();
+                break;
+            case BSIZE:
+                break;
+            case INSERT:
+                break;
+
+            default:
+                LOG_INFO << "unknown action: " << action;
+                index += blen;
+                break;
+        }
     }
 }

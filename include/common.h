@@ -20,4 +20,6 @@
 
 #define SET_MAX_ELEMENT 1 << 26
 
+#define ACTION_BUFFER_MAGIC 0x78
+
 #endif

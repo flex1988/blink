@@ -8,23 +8,28 @@ struct ListMetaBlockPtr {
     int32_t size;  // meta item contain keys
 };
 
-enum Action { DEFAULT, NEWLIST, UNIQUE, SIZE, BSIZE, INSERT, ALLOC };
+enum MetaType { LIST, SET };
+
+enum Action { DEFAULT, INIT, REINIT, UNIQUE, SIZE, BSIZE, INSERT, ALLOC };
 
 class MetaBase {
 public:
     MetaBase() = default;
     std::string ActionBuffer();
     void PushAction(Action action, int16_t op, const std::string& str);
-
+    void pushActionHeader();
     virtual int64_t Size() { return 0; };
     virtual int64_t IncrSize() { return 0; };
     virtual std::string ToString() { return NULL; };
     virtual void SetUnique(std::string unique);
-    
     virtual std::string GetUnique() { return unique_; };
+    void SetType(MetaType type);
+    MetaType GetType();
+
 private:
-    std::vector<int32_t> action_buffer_;
+    std::string action_buffer_;
     std::string unique_;
+    MetaType type_;
 };
 
 class ListMetaBlock : public MetaBase {
@@ -48,8 +53,7 @@ public:
 
 class ListMeta : public MetaBase {
 public:
-    ListMeta();
-    ListMeta(const std::string&);
+    ListMeta(const std::string&, Action);
     std::string ToString();
     ListMetaBlockPtr* BlockAt(int);
     int AllocArea();
@@ -59,7 +63,9 @@ public:
     bool IsBlocksFull();
 
     int64_t Size() { return size_; };
+    void SetSize(int64_t size) { size_ = size; };
     int64_t BSize() { return bsize_; };
+    void SetBSize(int64_t size) { bsize_ = size; };
     int64_t IncrSize()
     {
         PushAction(SIZE, ++size_, "");

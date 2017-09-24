@@ -64,6 +64,7 @@ private:
 
     void loadMetaSnapshot();
     void loadMetaLog();
+    void reloadListActionBuffer(char *buf,size_t blen);
 
     int metafd_;
     uint64_t meta_log_size_;
