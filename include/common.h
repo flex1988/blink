@@ -22,4 +22,6 @@
 
 #define ACTION_BUFFER_MAGIC 0x78
 
+#define META_SNAP_MAGIC 0x56
+
 #endif

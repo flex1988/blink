@@ -2,11 +2,7 @@
 #define __META_H__
 
 #include "common.h"
-
-struct ListMetaBlockPtr {
-    int32_t addr;  // meta item address
-    int32_t size;  // meta item contain keys
-};
+#include "redis_list.h"
 
 enum MetaType { LIST, SET };
 
@@ -16,17 +12,17 @@ class MetaBase {
 public:
     MetaBase() = default;
     std::string ActionBuffer();
-    void PushAction(Action action, int16_t op, const std::string& str);
-    void pushActionHeader();
-    virtual int64_t Size() { return 0; };
-    virtual int64_t IncrSize() { return 0; };
-    virtual std::string ToString() { return NULL; };
-    virtual void SetUnique(std::string unique);
-    virtual std::string GetUnique() { return unique_; };
+    void SaveAction(Action action, int16_t op, const std::string& str);
+    void InitActionHeader();
     void SetType(MetaType type);
     MetaType GetType();
     void ResetBuffer();
 
+    virtual void SetUnique(std::string unique);
+    virtual int64_t Size() { return 0; };
+    virtual int64_t IncrSize() { return 0; };
+    virtual std::string ToString() { return NULL; };
+    virtual std::string GetUnique() { return unique_; };
 private:
     std::string action_buffer_;
     std::string unique_;
@@ -35,26 +31,43 @@ private:
 
 class ListMetaBlock : public MetaBase {
 public:
-    int64_t addr[LIST_BLOCK_KEYS];
+    ListMetaBlock(const std::string& key, int64_t addr) : self_(addr), key_(key)
+    {
+        std::memset(addr_, 0, sizeof(int64_t) * LIST_BLOCK_KEYS);
+        unique_ = EncodeListBlockKey(key, addr);
+    }
 
-    ListMetaBlock() { std::memset(addr, 0, sizeof(int64_t) * LIST_BLOCK_KEYS); }
-    ListMetaBlock(const std::string& str) { str.copy((char*)addr, sizeof(int64_t) * LIST_BLOCK_KEYS); }
+    ListMetaBlock(const std::string& str) : self_(0) { str.copy((char*)addr_, sizeof(int64_t) * LIST_BLOCK_KEYS); }
     std::string ToString();
 
+    int64_t FetchAddr(int64_t index) { return addr_[index]; };
     void Insert(int index, int size, int val)
     {
         int cursor = size;
         while (cursor > index) {
-            addr[cursor] = addr[cursor - 1];
+            addr_[cursor] = addr_[cursor - 1];
             cursor--;
         }
-        addr[index] = val;
+        addr_[index] = val;
     }
+
+    std::string GetUnique() { return unique_; };
+private:
+    int64_t addr_[LIST_BLOCK_KEYS];
+    int64_t self_;
+    std::string key_;
+    std::string unique_;
+};
+
+struct ListMetaBlockPtr {
+    int32_t addr;  // meta item address
+    int32_t size;  // meta item contain keys
 };
 
 class ListMeta : public MetaBase {
 public:
     ListMeta(const std::string&, Action);
+    ~ListMeta() = default;
     std::string ToString();
     ListMetaBlockPtr* BlockAt(int);
     int AllocArea();
@@ -70,12 +83,12 @@ public:
     void SetArea(uint64_t area) { area_index_ = area; };
     int64_t IncrSize()
     {
-        PushAction(SIZE, ++size_, "");
+        SaveAction(SIZE, ++size_, "");
         return size_;
     };
     int64_t IncrBSize()
     {
-        PushAction(BSIZE, ++bsize_, "");
+        SaveAction(BSIZE, ++bsize_, "");
         return bsize_;
     };
     ListMetaBlockPtr* InsertNewMetaBlockPtr(int index);

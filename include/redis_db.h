@@ -53,18 +53,14 @@ private:
 
     rocksdb::Options options_;
 
-    std::unordered_map<std::string, std::shared_ptr<ListMeta>> listmeta_;
-    std::unordered_map<std::string, std::shared_ptr<ListMetaBlock>> listblock_;
-    std::unordered_map<std::string, std::shared_ptr<SetMeta>> setmeta_;
-
     std::unordered_map<std::string, std::shared_ptr<MetaBase>> memmeta_;
 
     port::RecordMutex mutex_list_record_;
     port::RecordMutex mutex_set_record_;
 
-    void loadMetaSnapshot();
-    void loadMetaLog();
-    void reloadListActionBuffer(char *buf, size_t blen);
+    void LoadMetaSnapshot();
+    void LoadMetaLog();
+    void ReloadListActionBuffer(char *buf, size_t blen);
 
     rocksdb::Status InsertListMeta(const std::string &key, std::shared_ptr<ListMeta> meta, uint64_t index,uint64_t *addr);
 
@@ -72,7 +68,6 @@ private:
     uint64_t meta_log_size_;
 
     std::mutex snap_mutex_;
-
     std::string msnap_;
     std::string mnewsnap_;
     std::string mlog_;

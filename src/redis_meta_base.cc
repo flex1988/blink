@@ -8,7 +8,7 @@ std::string MetaBase::ActionBuffer()
     buf.append("\r\n", 2);
 
     ResetBuffer();
-    
+
     return buf;
 }
 
@@ -16,18 +16,18 @@ void MetaBase::ResetBuffer()
 {
     action_buffer_.clear();
 
-    pushActionHeader();
-    PushAction(REINIT, unique_.size(), unique_);
+    InitActionHeader();
+    SaveAction(REINIT, unique_.size(), unique_);
 }
 
-void MetaBase::pushActionHeader()
+void MetaBase::InitActionHeader()
 {
     action_buffer_.append(1, ACTION_BUFFER_MAGIC);
     action_buffer_.append(1, type_);
     action_buffer_.append(1, 0);
 }
 
-void MetaBase::PushAction(Action action, int16_t op, const std::string& str)
+void MetaBase::SaveAction(Action action, int16_t op, const std::string& str)
 {
     action_buffer_.append((char*)&action, 2);
     action_buffer_.append((char*)&op, 2);
@@ -39,6 +39,7 @@ void MetaBase::PushAction(Action action, int16_t op, const std::string& str)
 
 void MetaBase::SetUnique(std::string unique)
 {
+    LOG_INFO << "set unique: " << unique;
     assert(unique.size() > 0);
     unique_ = unique;
 }

@@ -13,10 +13,10 @@
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
 
-static size_t readSync(int fd, char* buffer, size_t nread)
+static ssize_t ReadSync(int fd, char* buffer, ssize_t nread)
 {
-    size_t n;
-    size_t last = nread;
+    ssize_t n;
+    ssize_t last = nread;
     for (;;) {
         if (last == 0) return nread;
         n = read(fd, buffer, last);
@@ -33,10 +33,10 @@ static size_t readSync(int fd, char* buffer, size_t nread)
     }
 }
 
-static size_t readNextChar(int fd, char* buffer, char target)
+static ssize_t ReadUntil(int fd, char* buffer, char target)
 {
-    size_t nread = 0;
-    size_t n;
+    ssize_t nread = 0;
+    ssize_t n;
     for (;;) {
         n = read(fd, buffer, 1);
 
@@ -114,40 +114,80 @@ void RedisDB::AppendMeta()
 void RedisDB::LoadMeta()
 {
     LOG_INFO << "Load meta info form disk file path: " + path_ + "/meta";
-    loadMetaSnapshot();
-    loadMetaLog();
+    LoadMetaSnapshot();
+    LoadMetaLog();
 }
 
-void RedisDB::loadMetaSnapshot()
+void RedisDB::LoadMetaSnapshot()
 {
-    std::ifstream snap(msnap_);
+    int fd = ::open(msnap_.c_str(), O_RDONLY);
+    if (fd < 0) {
+        LOG_INFO << "open meta log not exists!";
+        return;
+    }
 
-    for (std::string line; std::getline(snap, line);) {
-        switch (line.at(0)) {
+    char buffer[65536];
+    uint16_t len;
+
+    ssize_t ret;
+
+    for (;;) {
+    header:
+        ret = ReadUntil(fd, buffer, META_SNAP_MAGIC);
+        if (ret == 0 || ret == -1) goto end;
+
+        ret = ReadSync(fd, buffer, 2);
+        if (ret == 0 || ret == -1 || ret < 2) goto end;
+
+        len = *(uint16_t*)(buffer);
+
+        LOG_INFO << "len: " << len;
+
+        ret = ReadSync(fd, buffer, len);
+        if (ret == 0 || ret == -1 || ret < len) goto end;
+
+        switch (buffer[0]) {
             case 'L': {
-                std::shared_ptr<ListMeta> meta = std::shared_ptr<ListMeta>(new ListMeta(line, REINIT));
-                LOG_INFO << "Key: " << meta->GetUnique();
-                LOG_INFO << "Size: " << meta->Size();
-                memmeta_[EncodeListMetaKey(meta->GetUnique())] = std::dynamic_pointer_cast<MetaBase>(meta);
+                LOG_INFO << "load list meta";
+                uint8_t klen = buffer[1];
+                std::string key = std::string(buffer[2], klen);
+                std::string metakey = EncodeListMetaKey(key);
+                LOG_INFO << "metakey" << metakey;
+                memmeta_[metakey] = std::shared_ptr<MetaBase>(new ListMeta(key, INIT));
                 break;
             }
-            case 'B': {
-                std::shared_ptr<ListMetaBlock> meta = std::shared_ptr<ListMetaBlock>(new ListMetaBlock(line));
-                //memmeta_[EncodeListBlockKey(meta->GetUnique())] = std::dynamic_pointer_cast<MetaBase>(meta);
+            case 'B':
+                LOG_INFO << "load list meta block";
+                uint8_t ulen = buffer[1];
+                std::string unique = std::string(buffer[2], ulen);
+                LOG_INFO << "unique: " << unique;
+                memmeta_[unique] =
+                    std::shared_ptr<MetaBase>(new ListMetaBlock(std::string(buffer[2 + unique.size()], sizeof(int64_t) * LIST_BLOCK_KEYS)));
                 break;
-            }
-            case 'S':
-                LOG_INFO << "set";
+            deafult:
                 break;
-            default:
-                LOG_INFO << "unknown meta info!";
         }
     }
 
     LOG_INFO << "load meta snapshot success";
+    return;
+
+end:
+    if (ret == 0) {
+        LOG_INFO << "load meta snap from disk success";
+        return;
+    }
+
+    if (ret == -1) {
+        LOG_INFO << "read meta snap failed " << std::string(strerror(errno));
+        return;
+    }
+
+    LOG_INFO << "meta snap corruption";
+    return;
 }
 
-void RedisDB::loadMetaLog()
+void RedisDB::LoadMetaLog()
 {
     int fd = ::open(mlog_.c_str(), O_RDONLY);
     if (fd < 0) {
@@ -157,60 +197,48 @@ void RedisDB::loadMetaLog()
 
     char buffer[2048];
     uint8_t msize;
-    size_t ret;
+    ssize_t ret;
     MetaType type;
 
     int load = 0;
 
     for (;;) {
     header:
-        ret = readNextChar(fd, buffer, ACTION_BUFFER_MAGIC);
-        if (ret == 0 || ret == -1) {
-            LOG_INFO << "load meta log from disk success: " << load;
-            return;
-        }
+        ret = ReadUntil(fd, buffer, ACTION_BUFFER_MAGIC);
+        if (ret == 0 || ret == -1) goto error;
 
-        ret = readSync(fd, buffer, 2);
-
-        if (ret == 0) {
-            LOG_INFO << "load meta log from disk success";
-            return;
-        }
-
-        if (ret == -1) {
-            LOG_INFO << "read meta log header failed " << std::string(strerror(errno));
-            return;
-        }
-
-        if (ret < 2) {
-            LOG_INFO << "meta log may lose data";
-            return;
-        }
+        ret = ReadSync(fd, buffer, 2);
+        if (ret == 0 || ret == -1 || ret < 2) goto error;
 
         type = static_cast<MetaType>(*buffer);
         msize = *(uint8_t*)(buffer + 1);
 
         if (msize == 0) goto header;
 
-        ret = readSync(fd, buffer, msize + 2);
-
-        if (ret == -1) {
-            LOG_INFO << "read meta log body failed " << std::string(strerror(errno));
-            return;
-        }
-
-        if (ret < msize + 2) {
-            LOG_INFO << "meta log may lose data";
-            return;
-        }
+        ret = ReadSync(fd, buffer, msize + 2);
+        if (ret == -1 || ret < msize + 2) goto error;
 
         load++;
 
         switch (type) {
             case LIST:
-                reloadListActionBuffer(buffer, ret - 2);
+                ReloadListActionBuffer(buffer, ret - 2);
         }
     }
+
+error:
+    if (ret == 0) {
+        LOG_INFO << "load meta log from disk success: " << load;
+        return;
+    }
+
+    if (ret == -1) {
+        LOG_INFO << "read meta log failed " << std::string(strerror(errno));
+        return;
+    }
+
+    LOG_INFO << "may lose data";
+    return;
 }
 
 void RedisDB::CompactMeta()
@@ -245,7 +273,7 @@ void RedisDB::CompactMeta()
     }
 }
 
-void RedisDB::reloadListActionBuffer(char* buf, size_t blen)
+void RedisDB::ReloadListActionBuffer(char* buf, size_t blen)
 {
     size_t index = 0;
     std::shared_ptr<ListMeta> meta;

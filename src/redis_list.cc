@@ -87,7 +87,7 @@ rocksdb::Status RedisDB::InsertListMeta(const std::string& key, std::shared_ptr<
     std::string blockval;
 
     if (memmeta_.find(blockkey) == memmeta_.end()) {
-        memmeta_[blockkey] = std::shared_ptr<MetaBase>(new ListMetaBlock());
+        memmeta_[blockkey] = std::shared_ptr<MetaBase>(new ListMetaBlock(key, blockptr->addr));
     }
 
     std::shared_ptr<ListMetaBlock> block = std::dynamic_pointer_cast<ListMetaBlock>(memmeta_[blockkey]);
@@ -134,13 +134,13 @@ rocksdb::Status RedisDB::LIndex(const std::string& key, const int64_t index, std
             std::string blockkey = EncodeListBlockKey(key, blockptr->addr);
             std::string blockval;
 
-            if (listblock_.find(blockkey) == listblock_.end()) {
+            if (memmeta_.find(blockkey) == memmeta_.end()) {
                 return rocksdb::Status::InvalidArgument("list meta block not exists");
             }
 
-            std::shared_ptr<ListMetaBlock> block = listblock_[blockkey];
+            std::shared_ptr<ListMetaBlock> block = std::dynamic_pointer_cast<ListMetaBlock>(memmeta_[blockkey]);
 
-            std::string valuekey = EncodeListValueKey(key, block->addr[cursor]);
+            std::string valuekey = EncodeListValueKey(key, block->FetchAddr(cursor));
 
             LOG_DEBUG << "get leaf key: " + valuekey;
             s = list_->Get(rocksdb::ReadOptions(), valuekey, val);

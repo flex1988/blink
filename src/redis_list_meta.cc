@@ -4,7 +4,7 @@
 ListMeta::ListMeta(const std::string& str, Action action)
 {
     SetType(LIST);
-    pushActionHeader();
+    InitActionHeader();
 
     if (action == REINIT) {
         assert(str.at(0) == 'L');
@@ -30,16 +30,22 @@ ListMeta::ListMeta(const std::string& str, Action action)
         std::memset(blocks_, 0, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS);
     }
 
-    PushAction(action, str.size(), str);
+    SaveAction(action, str.size(), str);
 }
 
 std::string ListMeta::ToString()
 {
     std::string str;
     std::string unique = GetUnique();
+
+    uint16_t len = 1 + 2 + 1 + 1 + unique.size() + sizeof(int64_t) * 5 + sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS + 2;
+
+    LOG_INFO << "tostring: " << len;
+    str.append(1, META_SNAP_MAGIC);
+    str.append((char*)&len, 2);
     str.append(1, 'L');
     str.append(1, unique.size());
-    str.append(unique.c_str(), unique.size());
+    str.append(unique.data(), unique.size());
     str.append((char*)&size_, sizeof(int64_t));
     str.append((char*)&limit_, sizeof(int64_t));
     str.append((char*)&bsize_, sizeof(int64_t));
@@ -53,7 +59,7 @@ std::string ListMeta::ToString()
 ListMetaBlockPtr* ListMeta::BlockAt(int index) { return &blocks_[index]; }
 int ListMeta::AllocArea()
 {
-    PushAction(ALLOC, area_index_ + 1, "");
+    SaveAction(ALLOC, area_index_ + 1, "");
     return area_index_++;
 }
 
@@ -70,7 +76,7 @@ ListMetaBlockPtr* ListMeta::InsertNewMetaBlockPtr(int index)
         return NULL;
     }
 
-    PushAction(INSERT, static_cast<int16_t>(index), "");
+    SaveAction(INSERT, static_cast<int16_t>(index), "");
 
     int cursor = bsize_;
     while (cursor > index) {
@@ -89,8 +95,18 @@ ListMetaBlockPtr* ListMeta::InsertNewMetaBlockPtr(int index)
 
 std::string ListMetaBlock::ToString()
 {
+    std::string unique = GetUnique();
+
+    uint16_t len = 1 + 2 + 1 + 1 + unique.size() + sizeof(int64_t) * LIST_BLOCK_KEYS;
+
+    LOG_INFO << "tostring: " << len;
+
     std::string str;
+    str.append(1, META_SNAP_MAGIC);
+    str.append((char*)&len, 2);
     str.append(1, 'B');
-    str.append((char*)addr, sizeof(int64_t) * LIST_BLOCK_KEYS);
+    str.append(1, unique.size());
+    str.append(unique.data(), unique.size());
+    str.append((char*)addr_, sizeof(int64_t) * LIST_BLOCK_KEYS);
     return str;
 }
