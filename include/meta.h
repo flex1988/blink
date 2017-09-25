@@ -25,6 +25,7 @@ public:
     virtual std::string GetUnique() { return unique_; };
     void SetType(MetaType type);
     MetaType GetType();
+    void ResetBuffer();
 
 private:
     std::string action_buffer_;
@@ -66,6 +67,7 @@ public:
     void SetSize(int64_t size) { size_ = size; };
     int64_t BSize() { return bsize_; };
     void SetBSize(int64_t size) { bsize_ = size; };
+    void SetArea(uint64_t area) { area_index_ = area; };
     int64_t IncrSize()
     {
         PushAction(SIZE, ++size_, "");
@@ -77,6 +79,7 @@ public:
         return bsize_;
     };
     ListMetaBlockPtr* InsertNewMetaBlockPtr(int index);
+    rocksdb::Status Insert(const std::string& key, uint64_t index, uint64_t* addr);
 
 private:
     int64_t size_;

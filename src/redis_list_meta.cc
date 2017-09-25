@@ -56,6 +56,7 @@ int ListMeta::AllocArea()
     PushAction(ALLOC, area_index_ + 1, "");
     return area_index_++;
 }
+
 int ListMeta::CurrentArea() { return area_index_; }
 bool ListMeta::IsElementsFull() { return size_ == limit_; }
 bool ListMeta::IsBlocksFull() { return bsize_ == blimit_; }

@@ -128,7 +128,12 @@ void RedisDB::loadMetaSnapshot()
                 std::shared_ptr<ListMeta> meta = std::shared_ptr<ListMeta>(new ListMeta(line, REINIT));
                 LOG_INFO << "Key: " << meta->GetUnique();
                 LOG_INFO << "Size: " << meta->Size();
-                memmeta_[meta->GetUnique()] = std::dynamic_pointer_cast<MetaBase>(meta);
+                memmeta_[EncodeListMetaKey(meta->GetUnique())] = std::dynamic_pointer_cast<MetaBase>(meta);
+                break;
+            }
+            case 'B': {
+                std::shared_ptr<ListMetaBlock> meta = std::shared_ptr<ListMetaBlock>(new ListMetaBlock(line));
+                //memmeta_[EncodeListBlockKey(meta->GetUnique())] = std::dynamic_pointer_cast<MetaBase>(meta);
                 break;
             }
             case 'S':
@@ -253,16 +258,24 @@ void RedisDB::reloadListActionBuffer(char* buf, size_t blen)
 
         switch (action) {
             case INIT: {
+                if (op < 0 || op > (blen - index)) {
+                    LOG_INFO << "meta log corruption";
+                    return;
+                }
                 std::string key = std::string(buf + index, op);
-                std::string metakey = EncodeMetaKey(key);
+                std::string metakey = EncodeListMetaKey(key);
                 meta = std::shared_ptr<ListMeta>(new ListMeta(key, INIT));
                 memmeta_[metakey] = std::dynamic_pointer_cast<MetaBase>(meta);
                 index += op;
                 break;
             }
             case REINIT: {
+                if (op < 0 || op > (blen - index)) {
+                    LOG_INFO << "meta log corruption";
+                    return;
+                }
                 std::string key = std::string(buf + index, op);
-                std::string metakey = EncodeMetaKey(key);
+                std::string metakey = EncodeListMetaKey(key);
                 assert(memmeta_.find(metakey) != memmeta_.end());
                 meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
                 index += op;
@@ -272,17 +285,18 @@ void RedisDB::reloadListActionBuffer(char* buf, size_t blen)
                 meta->SetSize(op);
                 break;
             case ALLOC:
-                meta->AllocArea();
+                meta->SetArea(op);
                 break;
             case BSIZE:
+                meta->SetBSize(op);
                 break;
             case INSERT:
+                meta->InsertNewMetaBlockPtr(op);
                 break;
 
             default:
                 LOG_INFO << "unknown action: " << action;
-                index += blen;
-                break;
+                return;
         }
     }
 }

@@ -6,11 +6,18 @@ std::string MetaBase::ActionBuffer()
     action_buffer_.at(2) = action_buffer_.size() - 3;
     buf.append(action_buffer_);
     buf.append("\r\n", 2);
+
+    ResetBuffer();
+    
+    return buf;
+}
+
+void MetaBase::ResetBuffer()
+{
     action_buffer_.clear();
 
     pushActionHeader();
     PushAction(REINIT, unique_.size(), unique_);
-    return buf;
 }
 
 void MetaBase::pushActionHeader()
