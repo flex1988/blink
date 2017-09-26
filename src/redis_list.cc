@@ -92,7 +92,7 @@ rocksdb::Status RedisDB::InsertListMeta(const std::string& key, std::shared_ptr<
 
     meta->IncrSize();
 
-    ListMetaBlockPtr* blockptr = NULL;
+    ListMetaBlockPtr* blockptr = nullptr;
 
     int i;
     for (i = 0; i < meta->BSize(); i++) {
@@ -100,7 +100,7 @@ rocksdb::Status RedisDB::InsertListMeta(const std::string& key, std::shared_ptr<
         if (index > blockptr->size) index -= blockptr->size;
     }
 
-    if (blockptr == NULL) {
+    if (blockptr == nullptr) {
         blockptr = meta->InsertNewMetaBlockPtr(i);
     }
 
@@ -111,7 +111,7 @@ rocksdb::Status RedisDB::InsertListMeta(const std::string& key, std::shared_ptr<
     if (blockptr->size == LIST_BLOCK_KEYS) {
         blockptr = meta->InsertNewMetaBlockPtr(i);
 
-        if (blockptr == NULL) {
+        if (blockptr == nullptr) {
             return rocksdb::Status::InvalidArgument("Maximum block size limited: " + std::to_string(meta->BSize()));
         }
     }

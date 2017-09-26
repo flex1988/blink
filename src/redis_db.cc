@@ -252,7 +252,7 @@ void RedisDB::CompactMeta()
     int snapfd = ::open(mnewsnap_.c_str(), O_CREAT | O_WRONLY | O_TRUNC);
 
     for (auto i = memmeta_.begin(); i != memmeta_.end(); ++i) {
-        std::string str = i->second->ToString();
+        std::string str = i->second->Serialize();
         nwrite = write(snapfd, str.c_str(), str.size());
         assert(nwrite == str.size());
     }

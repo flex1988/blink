@@ -14,18 +14,16 @@ public:
     std::string ActionBuffer();
     void SaveAction(Action action, int16_t op, const std::string& str);
     void InitActionHeader();
-    void SetType(MetaType type);
-    MetaType GetType();
+    MetaType Type(){return type_};
     void ResetBuffer();
 
-    virtual void SetUnique(std::string unique);
-    virtual int64_t Size() { return 0; };
-    virtual int64_t IncrSize() { return 0; };
-    virtual std::string ToString() { return NULL; };
-    virtual std::string GetUnique() { return unique_; };
+    std::string Key() { return key_; };
+    virtual std::string Serialize() = 0;
+    virtual std::shared_ptr<MetaBase> Deserialize(const MetaBase&) = 0;
+
 private:
     std::string action_buffer_;
-    std::string unique_;
+    std::string key_;
     MetaType type_;
 };
 
@@ -38,11 +36,11 @@ public:
     }
 
     ListMetaBlock(const std::string& str) : self_(0) { str.copy((char*)addr_, sizeof(int64_t) * LIST_BLOCK_KEYS); }
-
     int64_t FetchAddr(int64_t index) { return addr_[index]; };
     void Insert(int index, int size, int val);
-    std::string ToString();
     std::string GetUnique() { return unique_; };
+    std::string Serialize();
+
 private:
     int64_t addr_[LIST_BLOCK_KEYS];
     int64_t self_;
@@ -57,7 +55,7 @@ struct ListMetaBlockPtr {
 
 class ListMeta : public MetaBase {
 public:
-    ListMeta(const std::string&, Action);
+    ListMeta(const std::string&);
     ~ListMeta() = default;
     std::string ToString();
     ListMetaBlockPtr* BlockAt(int);
@@ -84,6 +82,8 @@ public:
     };
     ListMetaBlockPtr* InsertNewMetaBlockPtr(int index);
     rocksdb::Status Insert(const std::string& key, uint64_t index, uint64_t* addr);
+    std::string Serialize();
+    bool operator==(const ListMeta& meta);
 
 private:
     int64_t size_;
@@ -95,9 +95,6 @@ private:
     int64_t area_index_;
 
     ListMetaBlockPtr blocks_[LIST_META_BLOCKS];
-
-    int64_t current_block_index_;
-    ListMetaBlockPtr* current_block_;
 };
 
 class SetMeta : public MetaBase {
