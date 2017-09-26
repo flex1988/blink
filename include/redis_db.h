@@ -66,6 +66,7 @@ private:
 
     std::shared_ptr<ListMeta> GetOrCreateListMeta(const std::string &key);
     std::shared_ptr<ListMetaBlock> GetOrCreateListMetaBlock(const std::string &key, int64_t addr);
+    std::shared_ptr<ListMeta> GetListMeta(const std::string& key);
 
     int metafd_;
     uint64_t meta_log_size_;

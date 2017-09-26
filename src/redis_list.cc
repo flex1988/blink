@@ -54,6 +54,20 @@ std::shared_ptr<ListMeta> RedisDB::GetOrCreateListMeta(const std::string& key)
     return meta;
 }
 
+std::shared_ptr<ListMeta> RedisDB::GetListMeta(const std::string& key)
+{
+    std::string metakey = EncodeListMetaKey(key);
+    std::string metaval;
+
+    if (memmeta_.find(metakey) == memmeta_.end()) {
+        return NULL;
+    }
+
+    std::shared_ptr<ListMeta> meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
+
+    return meta;
+}
+
 std::shared_ptr<ListMetaBlock> RedisDB::GetOrCreateListMetaBlock(const std::string& key, int64_t addr)
 {
     std::string blockkey = EncodeListBlockKey(key, addr);
@@ -128,18 +142,15 @@ rocksdb::Status RedisDB::LIndex(const std::string& key, const int64_t index, std
 {
     rocksdb::Status s;
 
-    std::string metakey = EncodeListMetaKey(key);
-    std::string metaval;
-
     int64_t cursor = index;
 
     RecordLock l(&mutex_list_record_, key);
 
-    if (memmeta_.find(metakey) == memmeta_.end()) {
+    std::shared_ptr<ListMeta> meta = GetListMeta(key);
+
+    if (meta == NULL) {
         return rocksdb::Status::InvalidArgument("list meta not exists");
     }
-
-    std::shared_ptr<ListMeta> meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
 
     if (cursor < 0) cursor = meta->Size() + cursor;
     if (cursor >= meta->Size()) return rocksdb::Status::InvalidArgument("outof list index");
