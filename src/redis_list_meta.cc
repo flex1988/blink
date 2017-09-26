@@ -27,6 +27,9 @@ ListMeta::ListMeta(const std::string& str, Action action)
         area_index_ = 0;
 
         SetUnique(str);
+
+        LOG_INFO << "set unique" << str;
+
         std::memset(blocks_, 0, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS);
     }
 
@@ -38,9 +41,8 @@ std::string ListMeta::ToString()
     std::string str;
     std::string unique = GetUnique();
 
-    uint16_t len = 1 + 2 + 1 + 1 + unique.size() + sizeof(int64_t) * 5 + sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS + 2;
+    uint16_t len = 2 + unique.size() + sizeof(int64_t) * 5 + sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS + 2;
 
-    LOG_INFO << "tostring: " << len;
     str.append(1, META_SNAP_MAGIC);
     str.append((char*)&len, 2);
     str.append(1, 'L');
@@ -63,7 +65,7 @@ int ListMeta::AllocArea()
     return area_index_++;
 }
 
-int ListMeta::CurrentArea() { return area_index_; }
+int ListMeta::CurrentArea() { return area_index_-1; }
 bool ListMeta::IsElementsFull() { return size_ == limit_; }
 bool ListMeta::IsBlocksFull() { return bsize_ == blimit_; }
 ListMetaBlockPtr* ListMeta::InsertNewMetaBlockPtr(int index)
@@ -93,13 +95,22 @@ ListMetaBlockPtr* ListMeta::InsertNewMetaBlockPtr(int index)
     return ptr;
 }
 
+void ListMetaBlock::Insert(int index, int size, int val)
+{
+    int cursor = size;
+    while (cursor > index) {
+        addr_[cursor] = addr_[cursor - 1];
+        cursor--;
+    }
+    addr_[index] = val;
+}
+
 std::string ListMetaBlock::ToString()
 {
     std::string unique = GetUnique();
+    assert(unique.size() > 0);
 
-    uint16_t len = 1 + 2 + 1 + 1 + unique.size() + sizeof(int64_t) * LIST_BLOCK_KEYS;
-
-    LOG_INFO << "tostring: " << len;
+    uint16_t len = 2 + unique.size() + sizeof(int64_t) * LIST_BLOCK_KEYS + 2;
 
     std::string str;
     str.append(1, META_SNAP_MAGIC);
@@ -108,5 +119,6 @@ std::string ListMetaBlock::ToString()
     str.append(1, unique.size());
     str.append(unique.data(), unique.size());
     str.append((char*)addr_, sizeof(int64_t) * LIST_BLOCK_KEYS);
+    str.append("\r\n");
     return str;
 }

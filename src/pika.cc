@@ -18,7 +18,7 @@ int main(int argc, char** argv)
 
     server.start();
 
-    loop.runEvery(10, boost::bind(&RedisDB::CompactMeta, server.db));
+    //loop.runEvery(10, boost::bind(&RedisDB::CompactMeta, server.db));
 
     initRedisCommand(server.db);
 

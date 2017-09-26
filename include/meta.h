@@ -38,19 +38,10 @@ public:
     }
 
     ListMetaBlock(const std::string& str) : self_(0) { str.copy((char*)addr_, sizeof(int64_t) * LIST_BLOCK_KEYS); }
-    std::string ToString();
 
     int64_t FetchAddr(int64_t index) { return addr_[index]; };
-    void Insert(int index, int size, int val)
-    {
-        int cursor = size;
-        while (cursor > index) {
-            addr_[cursor] = addr_[cursor - 1];
-            cursor--;
-        }
-        addr_[index] = val;
-    }
-
+    void Insert(int index, int size, int val);
+    std::string ToString();
     std::string GetUnique() { return unique_; };
 private:
     int64_t addr_[LIST_BLOCK_KEYS];

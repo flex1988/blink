@@ -152,7 +152,6 @@ void RedisDB::LoadMetaSnapshot()
                 uint8_t klen = buffer[1];
                 std::string key = std::string(buffer[2], klen);
                 std::string metakey = EncodeListMetaKey(key);
-                LOG_INFO << "metakey" << metakey;
                 memmeta_[metakey] = std::shared_ptr<MetaBase>(new ListMeta(key, INIT));
                 break;
             }
@@ -160,11 +159,11 @@ void RedisDB::LoadMetaSnapshot()
                 LOG_INFO << "load list meta block";
                 uint8_t ulen = buffer[1];
                 std::string unique = std::string(buffer[2], ulen);
-                LOG_INFO << "unique: " << unique;
                 memmeta_[unique] =
                     std::shared_ptr<MetaBase>(new ListMetaBlock(std::string(buffer[2 + unique.size()], sizeof(int64_t) * LIST_BLOCK_KEYS)));
                 break;
             deafult:
+                LOG_INFO << "wrong meta snapshot";
                 break;
         }
     }

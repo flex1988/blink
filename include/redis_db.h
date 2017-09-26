@@ -62,7 +62,10 @@ private:
     void LoadMetaLog();
     void ReloadListActionBuffer(char *buf, size_t blen);
 
-    rocksdb::Status InsertListMeta(const std::string &key, std::shared_ptr<ListMeta> meta, uint64_t index,uint64_t *addr);
+    rocksdb::Status InsertListMeta(const std::string &key, std::shared_ptr<ListMeta> meta, uint64_t index,int64_t* addr);
+
+    std::shared_ptr<ListMeta> GetOrCreateListMeta(const std::string &key);
+    std::shared_ptr<ListMetaBlock> GetOrCreateListMetaBlock(const std::string &key, int64_t addr);
 
     int metafd_;
     uint64_t meta_log_size_;

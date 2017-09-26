@@ -10,17 +10,12 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
 {
     rocksdb::Status s;
 
-    std::string metakey = EncodeListMetaKey(key);
-    std::string metaval;
-
     RecordLock l(&mutex_list_record_, key);
 
-    if (memmeta_.find(metakey) == memmeta_.end()) {
-        memmeta_[metakey] = std::shared_ptr<MetaBase>(new ListMeta(key, INIT));
-    }
-    std::shared_ptr<ListMeta> meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
+    std::shared_ptr<ListMeta> meta = GetOrCreateListMeta(key);
 
-    uint64_t addr;
+    int64_t addr;
+
     s = InsertListMeta(key, meta, 0, &addr);
 
     if (!s.ok()) {
@@ -29,6 +24,8 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
     }
 
     std::string leaf = EncodeListValueKey(key, addr);
+
+    LOG_DEBUG << "set leaf: " << leaf;
 
     s = list_->Put(rocksdb::WriteOptions(), leaf, val);
 
@@ -43,7 +40,35 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
     return s;
 }
 
-rocksdb::Status RedisDB::InsertListMeta(const std::string& key, std::shared_ptr<ListMeta> meta, uint64_t index, uint64_t* addr)
+std::shared_ptr<ListMeta> RedisDB::GetOrCreateListMeta(const std::string& key)
+{
+    std::string metakey = EncodeListMetaKey(key);
+    std::string metaval;
+
+    if (memmeta_.find(metakey) == memmeta_.end()) {
+        memmeta_[metakey] = std::shared_ptr<MetaBase>(new ListMeta(key, INIT));
+    }
+
+    std::shared_ptr<ListMeta> meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
+
+    return meta;
+}
+
+std::shared_ptr<ListMetaBlock> RedisDB::GetOrCreateListMetaBlock(const std::string& key, int64_t addr)
+{
+    std::string blockkey = EncodeListBlockKey(key, addr);
+    std::string blockval;
+
+    if (memmeta_.find(blockkey) == memmeta_.end()) {
+        memmeta_[blockkey] = std::shared_ptr<MetaBase>(new ListMetaBlock(key, addr));
+    }
+
+    std::shared_ptr<ListMetaBlock> block = std::dynamic_pointer_cast<ListMetaBlock>(memmeta_[blockkey]);
+
+    return block;
+}
+
+rocksdb::Status RedisDB::InsertListMeta(const std::string& key, std::shared_ptr<ListMeta> meta, uint64_t index, int64_t* addr)
 {
     rocksdb::Status s;
 
@@ -54,14 +79,14 @@ rocksdb::Status RedisDB::InsertListMeta(const std::string& key, std::shared_ptr<
     meta->IncrSize();
 
     ListMetaBlockPtr* blockptr = NULL;
-    int i;
 
+    int i;
     for (i = 0; i < meta->BSize(); i++) {
         blockptr = meta->BlockAt(i);
         if (index > blockptr->size) index -= blockptr->size;
     }
 
-    if (blockptr == NULL && index == 0) {
+    if (blockptr == NULL) {
         blockptr = meta->InsertNewMetaBlockPtr(i);
     }
 
@@ -83,14 +108,7 @@ rocksdb::Status RedisDB::InsertListMeta(const std::string& key, std::shared_ptr<
 
     blockptr->size++;
 
-    std::string blockkey = EncodeListBlockKey(key, blockptr->addr);
-    std::string blockval;
-
-    if (memmeta_.find(blockkey) == memmeta_.end()) {
-        memmeta_[blockkey] = std::shared_ptr<MetaBase>(new ListMetaBlock(key, blockptr->addr));
-    }
-
-    std::shared_ptr<ListMetaBlock> block = std::dynamic_pointer_cast<ListMetaBlock>(memmeta_[blockkey]);
+    std::shared_ptr<ListMetaBlock> block = GetOrCreateListMetaBlock(key, blockptr->addr);
 
     block->Insert(index, blockptr->size, meta->AllocArea());
 
