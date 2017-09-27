@@ -17,13 +17,13 @@ void MetaBase::ResetBuffer()
     action_buffer_.clear();
 
     InitActionHeader();
-    SaveAction(REINIT, unique_.size(), unique_);
+    SaveAction(REINIT, Key().size(), Key());
 }
 
 void MetaBase::InitActionHeader()
 {
     action_buffer_.append(1, ACTION_BUFFER_MAGIC);
-    action_buffer_.append(1, type_);
+    action_buffer_.append(1, Type());
     action_buffer_.append(1, 0);
 }
 
@@ -36,13 +36,3 @@ void MetaBase::SaveAction(Action action, int16_t op, const std::string& str)
 
     action_buffer_.append(str);
 }
-
-void MetaBase::SetUnique(std::string unique)
-{
-    LOG_INFO << "set unique: " << unique;
-    assert(unique.size() > 0);
-    unique_ = unique;
-}
-
-void MetaBase::SetType(MetaType type) { type_ = type; }
-MetaType MetaBase::GetType() { return type_; }

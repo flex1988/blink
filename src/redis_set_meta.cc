@@ -4,7 +4,7 @@
 
 SetMeta::SetMeta(const std::string& key) : size_(0), limit_(SET_MAX_ELEMENT), key_(key), bf_(256, 0) {}
 SetMeta::~SetMeta() {}
-std::string SetMeta::ToString()
+std::string SetMeta::Serialize()
 {
     std::string buf;
     buf.append(1, 'S');

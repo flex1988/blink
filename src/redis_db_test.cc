@@ -29,17 +29,15 @@ TEST_F(RedisDBTest, LIST)
     int64_t llen;
     std::string val;
 
-    for (int i = 0; i < 100000; i++) {
+    for (int i = 0; i < 200000; i++) {
         s = db_->LPush("mylist", std::to_string(i), &llen);
         EXPECT_EQ(true, s.ok());
         EXPECT_EQ(llen, i + 1);
-    }
 
-    //for (int i = 0; i < 100000; i++) {
-        //s = db_->LIndex("mylist", i, &val);
-        //ASSERT_TRUE(s.ok());
-        //EXPECT_EQ(std::to_string(99999 - i), val);
-    //}
+        s = db_->LIndex("mylist", 0, &val);
+        ASSERT_TRUE(s.ok());
+        EXPECT_EQ(std::to_string(i), val);
+    }
 }
 
 int main(int argc, char **argv)

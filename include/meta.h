@@ -4,67 +4,47 @@
 #include "common.h"
 #include "redis_list.h"
 
-enum MetaType { LIST, SET };
+enum MetaType { LIST, LISTBLOCK, SET };
 
 enum Action { DEFAULT, INIT, REINIT, UNIQUE, SIZE, BSIZE, INSERT, ALLOC };
-
-class MetaBase {
-public:
-    MetaBase() = default;
-    std::string ActionBuffer();
-    void SaveAction(Action action, int16_t op, const std::string& str);
-    void InitActionHeader();
-    MetaType Type(){return type_};
-    void ResetBuffer();
-
-    std::string Key() { return key_; };
-    virtual std::string Serialize() = 0;
-    virtual std::shared_ptr<MetaBase> Deserialize(const MetaBase&) = 0;
-
-private:
-    std::string action_buffer_;
-    std::string key_;
-    MetaType type_;
-};
-
-class ListMetaBlock : public MetaBase {
-public:
-    ListMetaBlock(const std::string& key, int64_t addr) : self_(addr), key_(key)
-    {
-        std::memset(addr_, 0, sizeof(int64_t) * LIST_BLOCK_KEYS);
-        unique_ = EncodeListBlockKey(key, addr);
-    }
-
-    ListMetaBlock(const std::string& str) : self_(0) { str.copy((char*)addr_, sizeof(int64_t) * LIST_BLOCK_KEYS); }
-    int64_t FetchAddr(int64_t index) { return addr_[index]; };
-    void Insert(int index, int size, int val);
-    std::string GetUnique() { return unique_; };
-    std::string Serialize();
-
-private:
-    int64_t addr_[LIST_BLOCK_KEYS];
-    int64_t self_;
-    std::string key_;
-    std::string unique_;
-};
 
 struct ListMetaBlockPtr {
     int32_t addr;  // meta item address
     int32_t size;  // meta item contain keys
 };
 
+class MetaBase {
+   public:
+    MetaBase() = default;
+    std::string ActionBuffer();
+    void SaveAction(Action action, int16_t op, const std::string& str);
+    void InitActionHeader();
+    void ResetBuffer();
+
+    virtual int64_t Size() = 0;
+    virtual MetaType Type() = 0;
+    virtual std::string Key() = 0;
+    virtual std::string Serialize() = 0;
+
+   private:
+    std::string action_buffer_;
+};
+
 class ListMeta : public MetaBase {
-public:
-    ListMeta(const std::string&);
+   public:
+    ListMeta(const std::string&, Action);
     ~ListMeta() = default;
-    std::string ToString();
-    ListMetaBlockPtr* BlockAt(int);
+
+    virtual MetaType Type() { return LIST; };
+    virtual std::string Key() { return key_; };
+    virtual std::string Serialize();
+
+    ListMetaBlockPtr* BlockAt(int index) { return &blocks_[index]; };
     int AllocArea();
-    int CurrentArea();
-
-    bool IsElementsFull();
-    bool IsBlocksFull();
-
+    int CurrentArea() { return area_index_ - 1; };
+    bool IsElementsFull() { return size_ == limit_; };
+    bool IsBlocksFull() { return bsize_ == blimit_; };
+    std::string key() { return key_; };
     int64_t Size() { return size_; };
     void SetSize(int64_t size) { size_ = size; };
     int64_t BSize() { return bsize_; };
@@ -82,10 +62,12 @@ public:
     };
     ListMetaBlockPtr* InsertNewMetaBlockPtr(int index);
     rocksdb::Status Insert(const std::string& key, uint64_t index, uint64_t* addr);
-    std::string Serialize();
     bool operator==(const ListMeta& meta);
+    ListMetaBlockPtr* GetIndexBlockPtr(int64_t index, int* blockidx);
 
-private:
+   private:
+    std::string key_;
+
     int64_t size_;
     int64_t limit_;
 
@@ -97,11 +79,39 @@ private:
     ListMetaBlockPtr blocks_[LIST_META_BLOCKS];
 };
 
+class ListMetaBlock : public MetaBase {
+   public:
+    ListMetaBlock(const std::string& key, int64_t addr) : self_addr_(addr), key_(key)
+    {
+        std::memset(addr_, 0, sizeof(int64_t) * LIST_BLOCK_KEYS);
+        unique_ = EncodeListBlockKey(key, addr);
+    }
+
+    ListMetaBlock(const std::string& str) : self_addr_(0) { str.copy((char*)addr_, sizeof(int64_t) * LIST_BLOCK_KEYS); }
+    virtual int64_t Size() { return size_; };
+    virtual MetaType Type() { return LISTBLOCK; };
+    virtual std::string Key() { return key_; };
+    virtual std::string Serialize();
+
+    int64_t FetchAddr(int64_t index) { return addr_[index]; };
+    void Insert(int index, int size, int val);
+    std::string GetUnique() { return unique_; };
+   private:
+    int64_t addr_[LIST_BLOCK_KEYS];
+    int64_t self_addr_;
+    std::string key_;
+    std::string unique_;
+    int64_t size_;
+};
+
 class SetMeta : public MetaBase {
-public:
+   public:
     SetMeta(const std::string& key);
     ~SetMeta();
-    std::string ToString();
+
+    virtual MetaType Type() { return SET; };
+    virtual std::string Key() { return key_; };
+    virtual std::string Serialize();
 
     int64_t IncrSize() { return size_++; };
     int64_t Size() { return size_; };
@@ -109,7 +119,7 @@ public:
     void BFAdd(const std::string& member);
     bool BFNotExists(const std::string& member);
 
-private:
+   private:
     int64_t size_;
     int64_t limit_;
     std::string key_;

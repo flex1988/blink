@@ -1,43 +1,49 @@
 #include "common.h"
 #include "meta.h"
 
-ListMeta::ListMeta(const std::string& key)
-    : type_(LIST), key_(key), size_(0), limit_(LIST_ELEMENT_SIZE), bsize_(0), blimit_(LIST_META_BLOCKS), area_index_(0)
+ListMeta::ListMeta(const std::string& str, Action action)
 {
     InitActionHeader();
 
-    /*if (action == REINIT) {*/
-    /*assert(str.at(0) == 'L');*/
-    /*uint8_t klen = (int8_t)str.at(1);*/
-    /*assert(klen < str.size() - 2);*/
+    if (action == REINIT) {
+        assert(str.at(0) == 'L');
+        uint8_t klen = (int8_t)str.at(1);
+        assert(klen < str.size() - 2);
 
-    /*SetUnique(str.substr(2, klen));*/
-    /*size_ = *(int64_t*)&str.at(klen + 2);*/
-    /*limit_ = *(int64_t*)&str.at(sizeof(int64_t) + klen + 2);*/
-    /*bsize_ = *(int64_t*)&str.at(sizeof(int64_t) * 2 + klen + 2);*/
-    /*blimit_ = *(int64_t*)&str.at(sizeof(int64_t) * 3 + klen + 2);*/
-    /*area_index_ = *(int64_t*)&str.at(sizeof(int64_t) * 4 + klen + 2);*/
-    /*str.copy((char*)blocks_, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS, 42 + klen);*/
-    /*}*/
-    /*else if (action == INIT) {*/
+        key_ = str.substr(2, klen);
+        size_ = *(int64_t*)&str.at(klen + 2);
+        limit_ = *(int64_t*)&str.at(sizeof(int64_t) + klen + 2);
+        bsize_ = *(int64_t*)&str.at(sizeof(int64_t) * 2 + klen + 2);
+        blimit_ = *(int64_t*)&str.at(sizeof(int64_t) * 3 + klen + 2);
+        area_index_ = *(int64_t*)&str.at(sizeof(int64_t) * 4 + klen + 2);
+        str.copy((char*)blocks_, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS, 42 + klen);
+    }
+    else if (action == INIT) {
+        key_ = str;
+        size_ = 0;
+        limit_ = LIST_ELEMENT_SIZE;
+        bsize_ = 0;
+        blimit_ = LIST_META_BLOCKS;
+        area_index_ = 0;
 
-    std::memset(blocks_, 0, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS);
-    /*}*/
+        std::memset(blocks_, 0, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS);
+    }
+
     SaveAction(action, str.size(), str);
 }
 
 std::string ListMeta::Serialize()
 {
     std::string str;
-    std::string unique = GetUnique();
+    std::string key = Key();
 
-    uint16_t len = 2 + unique.size() + sizeof(int64_t) * 5 + sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS + 2;
+    uint16_t len = 2 + key.size() + sizeof(int64_t) * 5 + sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS + 2;
 
     str.append(1, META_SNAP_MAGIC);
     str.append((char*)&len, 2);
     str.append(1, 'L');
-    str.append(1, unique.size());
-    str.append(unique.data(), unique.size());
+    str.append(1, key.size());
+    str.append(key.data(), key.size());
     str.append((char*)&size_, sizeof(int64_t));
     str.append((char*)&limit_, sizeof(int64_t));
     str.append((char*)&bsize_, sizeof(int64_t));
@@ -48,16 +54,12 @@ std::string ListMeta::Serialize()
     return str;
 }
 
-ListMetaBlockPtr* ListMeta::BlockAt(int index) { return &blocks_[index]; }
 int ListMeta::AllocArea()
 {
     SaveAction(ALLOC, area_index_ + 1, "");
     return area_index_++;
 }
 
-int ListMeta::CurrentArea() { return area_index_ - 1; }
-bool ListMeta::IsElementsFull() { return size_ == limit_; }
-bool ListMeta::IsBlocksFull() { return bsize_ == blimit_; }
 ListMetaBlockPtr* ListMeta::InsertNewMetaBlockPtr(int index)
 {
     if (IsBlocksFull()) {
@@ -87,12 +89,12 @@ ListMetaBlockPtr* ListMeta::InsertNewMetaBlockPtr(int index)
 
 bool ListMeta::operator==(const ListMeta& meta)
 {
+    if (key_ != meta.key_) return false;
     if (size_ != meta.size_) return false;
     if (limit_ != meta.limit_) return false;
     if (bsize_ != meta.bsize_) return false;
     if (blimit_ != meta.blimit_) return false;
     if (area_index_ != meta.area_index_) return false;
-
     if (std::memcmp(blocks_, meta.blocks_, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS) != 0) return false;
 
     return true;
@@ -124,4 +126,23 @@ std::string ListMetaBlock::Serialize()
     str.append((char*)addr_, sizeof(int64_t) * LIST_BLOCK_KEYS);
     str.append("\r\n");
     return str;
+}
+
+ListMetaBlockPtr* ListMeta::GetIndexBlockPtr(int64_t index, int* blockidx)
+{
+    ListMetaBlockPtr* blockptr;
+
+    int i = 0;
+    for (; i < BSize(); i++) {
+        blockptr = BlockAt(i);
+
+        if (index < blockptr->size) {
+            *blockidx = i;
+            return blockptr;
+        }
+        else
+            index -= blockptr->size;
+    }
+
+    return nullptr;
 }

@@ -15,7 +15,6 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
     std::shared_ptr<ListMeta> meta = GetOrCreateListMeta(key);
 
     int64_t addr;
-
     s = InsertListMeta(key, meta, 0, &addr);
 
     if (!s.ok()) {
@@ -82,34 +81,34 @@ std::shared_ptr<ListMetaBlock> RedisDB::GetOrCreateListMetaBlock(const std::stri
     return block;
 }
 
-rocksdb::Status RedisDB::InsertListMeta(const std::string& key, std::shared_ptr<ListMeta> meta, uint64_t index, int64_t* addr)
+rocksdb::Status RedisDB::InsertListMeta(const std::string& key, std::shared_ptr<ListMeta> meta, int64_t index, int64_t* addr)
 {
-    rocksdb::Status s;
-
     if (meta->IsElementsFull()) {
         return rocksdb::Status::InvalidArgument("Maximum element size limited: " + std::to_string(meta->Size()));
     }
 
+    if (index > meta->Size() || index < 0) {
+        return rocksdb::Status::InvalidArgument("index size beyond max index: " + std::to_string(index));
+    }
+
     meta->IncrSize();
 
-    ListMetaBlockPtr* blockptr = nullptr;
-
-    int i;
-    for (i = 0; i < meta->BSize(); i++) {
-        blockptr = meta->BlockAt(i);
-        if (index > blockptr->size) index -= blockptr->size;
-    }
+    int blockidx = 0;
+    ListMetaBlockPtr* blockptr = meta->GetIndexBlockPtr(index, &blockidx);
 
     if (blockptr == nullptr) {
-        blockptr = meta->InsertNewMetaBlockPtr(i);
-    }
-
-    if (index > blockptr->size) {
-        return rocksdb::Status::InvalidArgument("meta block size wrong");
+        if (index == 0) {
+            blockidx = 0;
+            blockptr = meta->InsertNewMetaBlockPtr(0);
+        }
+        else {
+            blockidx = meta->BSize();
+            blockptr = meta->InsertNewMetaBlockPtr(meta->BSize());
+        }
     }
 
     if (blockptr->size == LIST_BLOCK_KEYS) {
-        blockptr = meta->InsertNewMetaBlockPtr(i);
+        blockptr = meta->InsertNewMetaBlockPtr(blockidx);
 
         if (blockptr == nullptr) {
             return rocksdb::Status::InvalidArgument("Maximum block size limited: " + std::to_string(meta->BSize()));
@@ -120,15 +119,14 @@ rocksdb::Status RedisDB::InsertListMeta(const std::string& key, std::shared_ptr<
         blockptr->addr = meta->AllocArea();
     }
 
-    blockptr->size++;
-
     std::shared_ptr<ListMetaBlock> block = GetOrCreateListMetaBlock(key, blockptr->addr);
 
     block->Insert(index, blockptr->size, meta->AllocArea());
+    blockptr->size++;
 
     *addr = meta->CurrentArea();
 
-    return s;
+    return rocksdb::Status::OK();
 }
 
 rocksdb::Status RedisDB::LPop(const std::string& key, std::string* val)

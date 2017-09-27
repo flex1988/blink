@@ -21,7 +21,6 @@ check: $(tests)
 	@rm -rf /tmp/db
 	@mkdir /tmp/db
 	@for t in $(notdir $(tests)); do echo "***** Running $$t"; $(build_dir)/$$t || exit 1; done
-	
 
 $(build_dir)/redis_db_test: $(obj)
 	$(CC) src/redis_db_test.cc $(obj) $(CFLAGS) -o $(build_dir)/redis_db_test

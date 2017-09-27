@@ -30,7 +30,7 @@ rocksdb::Status RedisDB::SAdd(const std::string& key, const std::string& member,
 
         if (s.ok()) {
             meta->BFAdd(member);
-            metaqueue_.push(meta->ToString());
+            /*metaqueue_.push(meta->ToString());*/
         }
     }
     else {
@@ -45,7 +45,7 @@ rocksdb::Status RedisDB::SAdd(const std::string& key, const std::string& member,
 
             if (s.ok()) {
                 meta->BFAdd(member);
-                metaqueue_.push(meta->ToString());
+                /*metaqueue_.push(meta->ToString());*/
             }
         }
         else if (s.ok()) {

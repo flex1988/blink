@@ -9,13 +9,15 @@ TEST_F(MetaTest, LISTMETA)
 {
     ListMeta *meta = new ListMeta("mykey", INIT);
 
-    meta->IncrSize();
-    meta->IncrBSize();
-    meta->InsertNewMetaBlockPtr(10);
-    meta->InsertNewMetaBlockPtr(100);
+    EXPECT_EQ(meta->Key(), "mykey");
+    EXPECT_EQ(meta->Type(), LIST);
 
-    std::string str = meta->ToString();
+    for (int i = 0; i < 1000; i++) {
+        meta->IncrSize();
+        meta->InsertNewMetaBlockPtr(i);
+    }
 
+    std::string str = meta->Serialize();
     ListMeta *meta1 = new ListMeta(str, REINIT);
 
     ASSERT_TRUE(*meta == *meta1);

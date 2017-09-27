@@ -132,7 +132,6 @@ void RedisDB::LoadMetaSnapshot()
     ssize_t ret;
 
     for (;;) {
-    header:
         ret = ReadUntil(fd, buffer, META_SNAP_MAGIC);
         if (ret == 0 || ret == -1) goto end;
 
@@ -155,14 +154,15 @@ void RedisDB::LoadMetaSnapshot()
                 memmeta_[metakey] = std::shared_ptr<MetaBase>(new ListMeta(key, INIT));
                 break;
             }
-            case 'B':
+            case 'B': {
                 LOG_INFO << "load list meta block";
                 uint8_t ulen = buffer[1];
                 std::string unique = std::string(buffer[2], ulen);
                 memmeta_[unique] =
                     std::shared_ptr<MetaBase>(new ListMetaBlock(std::string(buffer[2 + unique.size()], sizeof(int64_t) * LIST_BLOCK_KEYS)));
                 break;
-            deafult:
+            }
+            default:
                 LOG_INFO << "wrong meta snapshot";
                 break;
         }
