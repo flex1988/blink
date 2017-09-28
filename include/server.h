@@ -2,7 +2,7 @@
 #define __PIKA_SERVER__
 
 #include "connection.h"
-#include "redis_db.h"
+#include "db.h"
 
 #include <muduo/base/Mutex.h>
 #include <muduo/net/TcpServer.h>

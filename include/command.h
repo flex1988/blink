@@ -2,7 +2,7 @@
 #define __PIKA_COMMAND__
 
 #include "connection.h"
-#include "redis_db.h"
+#include "db.h"
 
 typedef void RedisCommandProc(Connection* conn);
 

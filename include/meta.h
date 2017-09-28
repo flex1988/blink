@@ -2,7 +2,7 @@
 #define __META_H__
 
 #include "common.h"
-#include "redis_list.h"
+#include "list.h"
 
 enum MetaType { LIST, LISTBLOCK, SET };
 
@@ -78,7 +78,6 @@ class ListMetaBlock : public MetaBase {
     ListMetaBlock(const std::string& key, int64_t addr) : self_addr_(addr), key_(key), size_(0)
     {
         std::memset(addr_, 0, sizeof(int64_t) * LIST_BLOCK_KEYS);
-        unique_ = EncodeListBlockKey(key, addr);
     }
 
     ListMetaBlock(const std::string& str) : self_addr_(0), size_(0) { str.copy((char*)addr_, sizeof(int64_t) * LIST_BLOCK_KEYS); }

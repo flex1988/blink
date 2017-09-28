@@ -22,6 +22,6 @@
 
 #define ACTION_BUFFER_MAGIC 0x78
 
-const uint16_t META_SNAP_MAGIC 0x56
+const uint16_t META_SNAP_MAGIC = 0x56;
 
 #endif
