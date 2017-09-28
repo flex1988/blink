@@ -1,7 +1,7 @@
-#include "redis_db.h"
+#include "db.h"
 #include "common.h"
 #include "meta.h"
-#include "redis_list.h"
+#include "list.h"
 
 #include <fcntl.h>
 #include <stdio.h>

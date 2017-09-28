@@ -1,6 +1,6 @@
-#include "redis_set.h"
+#include "set.h"
 #include "meta.h"
-#include "redis_db.h"
+#include "db.h"
 
 rocksdb::Status RedisDB::SAdd(const std::string& key, const std::string& member, int64_t* res)
 {

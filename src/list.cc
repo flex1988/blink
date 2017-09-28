@@ -1,8 +1,8 @@
-#include "redis_list.h"
+#include "list.h"
 #include "common.h"
+#include "db.h"
 #include "meta.h"
 #include "mutex.h"
-#include "redis_db.h"
 
 #include <memory>
 
@@ -61,7 +61,7 @@ rocksdb::Status RedisDB::LPop(const std::string& key, std::string& val)
 
     s = list_->Get(rocksdb::ReadOptions(), leaf, &val);
 
-    if(!s.ok()) return s;
+    if (!s.ok()) return s;
 
     s = list_->Delete(rocksdb::WriteOptions(), leaf);
 

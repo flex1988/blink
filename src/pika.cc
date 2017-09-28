@@ -1,5 +1,5 @@
-#include "redis_command.h"
-#include "redis_db.h"
+#include "command.h"
+#include "db.h"
 #include "server.h"
 
 #include <muduo/net/EventLoop.h>

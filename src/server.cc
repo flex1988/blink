@@ -1,6 +1,6 @@
 #include "server.h"
 #include "connection.h"
-#include "redis_db.h"
+#include "db.h"
 
 #include <muduo/base/Atomic.h>
 #include <muduo/base/Logging.h>

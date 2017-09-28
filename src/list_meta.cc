@@ -1,6 +1,6 @@
 #include "common.h"
 #include "meta.h"
-#include "redis_db.h"
+#include "db.h"
 
 ListMeta::ListMeta(const std::string& str, Action action)
 {
