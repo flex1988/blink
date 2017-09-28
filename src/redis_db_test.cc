@@ -44,10 +44,38 @@ TEST_F(RedisDBTest, LIST)
         EXPECT_EQ(std::to_string(i), val);
     }
 
-    for (int i = 199999; i >=0; i--) {
+    for (int i = 199999; i >= 0; i--) {
         s = db_->LPop("mylist", val);
         ASSERT_TRUE(s.ok());
         EXPECT_EQ(std::to_string(i), val);
+    }
+}
+
+TEST_F(RedisDBTest, COMPACT)
+{
+    int64_t llen;
+    rocksdb::Status s;
+    std::string val;
+
+    for (int i = 0; i < 1000; i++) {
+        for (int j = 0; j < 10; j++) {
+            s = db_->LPush(std::to_string(i), std::to_string(j), &llen);
+            EXPECT_EQ(true, s.ok());
+        }
+    }
+
+    db_->CompactMeta();
+
+    delete db_.get();
+
+    db_ = std::shared_ptr<RedisDB>(new RedisDB("/tmp/db"));
+
+    for (int i = 0; i < 1000; i++) {
+        for (int j = 0; j >= 0; j--) {
+            s = db_->LIndex(std::to_string(i), j, &val);
+            EXPECT_EQ(true, s.ok());
+            EXPECT_EQ(std::to_string(j), val);
+        }
     }
 }
 

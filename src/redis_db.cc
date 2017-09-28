@@ -100,7 +100,9 @@ RedisDB::RedisDB(const std::string& path) : metaqueue_(), path_(path), meta_log_
     metafd_ = ::open(std::string(path + "/meta.log").data(), O_CREAT | O_WRONLY | O_APPEND);
 }
 
-RedisDB::~RedisDB() {}
+RedisDB::~RedisDB()
+{  // Close();
+}
 void RedisDB::AppendMeta()
 {
     while (1) {
@@ -109,6 +111,12 @@ void RedisDB::AppendMeta()
         assert(w = meta.size());
         meta_log_size_ += w;
     }
+}
+void RedisDB::Close()
+{
+    delete kv_.get();
+    delete list_.get();
+    delete set_.get();
 }
 
 void RedisDB::LoadMeta()
@@ -253,7 +261,7 @@ void RedisDB::CompactMeta()
 
     for (auto i = memmeta_.begin(); i != memmeta_.end(); ++i) {
         std::string str = i->second->Serialize();
-        nwrite = write(snapfd, str.c_str(), str.size());
+        nwrite = ::write(snapfd, str.c_str(), str.size());
         assert(nwrite == str.size());
     }
 
@@ -309,13 +317,13 @@ void RedisDB::ReloadListActionBuffer(char* buf, size_t blen)
                 break;
             }
             case SIZE:
-                //meta->SetSize(op);
+                // meta->SetSize(op);
                 break;
             case ALLOC:
-                //meta->SetArea(op);
+                // meta->SetArea(op);
                 break;
             case BSIZE:
-                //meta->SetBSize(op);
+                // meta->SetBSize(op);
                 break;
             case INSERT:
                 meta->InsertNewMetaBlockPtr(op);

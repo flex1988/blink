@@ -23,6 +23,8 @@ class RedisDB {
     RedisDB(const std::string& path);
     ~RedisDB();
 
+    void Close();
+
     enum CommitMode { SYNC, ASYNC };
     // Status Del(const std::string &key, int64_t *count);
     // Status Set(const std::string &key, const std::string &val,

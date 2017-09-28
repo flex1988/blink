@@ -95,6 +95,15 @@ bool ListMeta::operator==(const ListMeta& meta)
     return true;
 }
 
+void ListMeta::RemoveBlockAt(int bidx)
+{
+    for (int cursor = bidx; cursor < bsize_; cursor++) {
+        blocks_[cursor] = blocks_[cursor + 1];
+    }
+
+    bsize_--;
+}
+
 void ListMetaBlock::Insert(int index, int val)
 {
     int cursor = size_;
@@ -140,7 +149,7 @@ std::string ListMetaBlock::Serialize()
     return str;
 }
 
-ListMetaBlockPtr* ListMeta::BlockAtIndex(int64_t index, int* bidx)
+ListMetaBlockPtr* ListMeta::BlockAtIndex(int64_t index, int* idx, int* bidx)
 {
     ListMetaBlockPtr* blockptr = nullptr;
 
@@ -149,7 +158,8 @@ ListMetaBlockPtr* ListMeta::BlockAtIndex(int64_t index, int* bidx)
         blockptr = BlockAt(i);
 
         if (index < blockptr->size) {
-            *bidx = index;
+            *idx = index;
+            *bidx = i;
             return blockptr;
         }
         else {
@@ -309,8 +319,9 @@ rocksdb::Status RedisDB::RemoveListMetaAt(const std::string& key, int64_t index,
         return rocksdb::Status::InvalidArgument("index size beyond max index: " + std::to_string(index));
     }
 
+    int idx = 0;
     int bidx = 0;
-    ListMetaBlockPtr* blockptr = meta->BlockAtIndex(index, &bidx);
+    ListMetaBlockPtr* blockptr = meta->BlockAtIndex(index, &idx, &bidx);
 
     if (blockptr == nullptr) {
         return rocksdb::Status::InvalidArgument("invalid index: " + std::to_string(index));
@@ -319,11 +330,20 @@ rocksdb::Status RedisDB::RemoveListMetaAt(const std::string& key, int64_t index,
     std::shared_ptr<ListMetaBlock> block = GetListMetaBlock(key, blockptr->addr);
     assert(block != nullptr);
 
-    *addr = block->Remove(bidx);
+    *addr = block->Remove(idx);
 
     blockptr->size--;
 
+    if (blockptr->size == 0) {
+        meta->RemoveBlockAt(bidx);
+    }
+
     meta->DecrSize();
+
+    if (meta->Size() == 0) {
+        std::string metakey = EncodeListMetaKey(key);
+        memmeta_.erase(metakey);
+    }
 
     return rocksdb::Status::OK();
 }
