@@ -19,25 +19,26 @@
 class SetMeta;
 
 class RedisDB {
-public:
-    RedisDB(const std::string &path);
+   public:
+    RedisDB(const std::string& path);
     ~RedisDB();
 
     enum CommitMode { SYNC, ASYNC };
     // Status Del(const std::string &key, int64_t *count);
     // Status Set(const std::string &key, const std::string &val,
     // const int32_t ttl = 0);
-    rocksdb::Status Get(const std::string &key, std::string &val);
-    rocksdb::Status Set(const std::string &key, const std::string &val);
+    rocksdb::Status Get(const std::string& key, std::string& val);
+    rocksdb::Status Set(const std::string& key, const std::string& val);
 
     // LIST
-    rocksdb::Status LPush(const std::string &key, const std::string &val, int64_t *llen);
-    rocksdb::Status LPop(const std::string &key, std::string *val);
-    rocksdb::Status LIndex(const std::string &key, const int64_t index, std::string *val);
+    rocksdb::Status LPush(const std::string& key, const std::string& val, int64_t* llen);
+    rocksdb::Status LPop(const std::string& key, std::string& val);
+    rocksdb::Status LIndex(const std::string& key, const int64_t index, std::string* val);
+    rocksdb::Status LLen(const std::string& key, int64_t* llen);
 
     // SET
-    rocksdb::Status SAdd(const std::string &key, const std::string &member, int64_t *res);
-    rocksdb::Status SCard(const std::string &key, int64_t *res);
+    rocksdb::Status SAdd(const std::string& key, const std::string& member, int64_t* res);
+    rocksdb::Status SCard(const std::string& key, int64_t* res);
 
     void AppendMeta();
     void CompactMeta();
@@ -45,7 +46,7 @@ public:
 
     Queue<std::string> metaqueue_;
 
-private:
+   private:
     std::string path_;
     std::unique_ptr<rocksdb::DBWithTTL> kv_;
     std::unique_ptr<rocksdb::DBWithTTL> list_;
@@ -60,13 +61,15 @@ private:
 
     void LoadMetaSnapshot();
     void LoadMetaLog();
-    void ReloadListActionBuffer(char *buf, size_t blen);
+    void ReloadListActionBuffer(char* buf, size_t blen);
 
-    rocksdb::Status InsertListMeta(const std::string &key, std::shared_ptr<ListMeta> meta, int64_t index,int64_t* addr);
+    rocksdb::Status InsertListMetaAt(const std::string& key, int64_t index, int64_t* addr, int64_t* size);
+    rocksdb::Status RemoveListMetaAt(const std::string& key, int64_t index, int64_t* addr);
 
-    std::shared_ptr<ListMeta> GetOrCreateListMeta(const std::string &key);
-    std::shared_ptr<ListMetaBlock> GetOrCreateListMetaBlock(const std::string &key, int64_t addr);
+    std::shared_ptr<ListMeta> GetOrCreateListMeta(const std::string& key);
+    std::shared_ptr<ListMetaBlock> GetOrCreateListMetaBlock(const std::string& key, int64_t addr);
     std::shared_ptr<ListMeta> GetListMeta(const std::string& key);
+    std::shared_ptr<ListMetaBlock> GetListMetaBlock(const std::string& key, int64_t addr);
 
     int metafd_;
     uint64_t meta_log_size_;

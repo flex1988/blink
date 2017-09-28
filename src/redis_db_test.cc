@@ -4,7 +4,7 @@
 #include "rocksdb/options.h"
 
 class RedisDBTest : public testing::Test {
-protected:
+   protected:
     virtual void SetUp() { db_ = std::shared_ptr<RedisDB>(new RedisDB("/tmp/db")); }
     std::shared_ptr<RedisDB> db_;
 };
@@ -27,6 +27,7 @@ TEST_F(RedisDBTest, LIST)
 {
     rocksdb::Status s;
     int64_t llen;
+    int64_t rlen;
     std::string val;
 
     for (int i = 0; i < 200000; i++) {
@@ -34,7 +35,17 @@ TEST_F(RedisDBTest, LIST)
         EXPECT_EQ(true, s.ok());
         EXPECT_EQ(llen, i + 1);
 
+        s = db_->LLen("mylist", &rlen);
+        EXPECT_EQ(true, s.ok());
+        EXPECT_EQ(llen, rlen);
+
         s = db_->LIndex("mylist", 0, &val);
+        ASSERT_TRUE(s.ok());
+        EXPECT_EQ(std::to_string(i), val);
+    }
+
+    for (int i = 199999; i >=0; i--) {
+        s = db_->LPop("mylist", val);
         ASSERT_TRUE(s.ok());
         EXPECT_EQ(std::to_string(i), val);
     }

@@ -4,16 +4,16 @@
 #include "connection.h"
 #include "redis_db.h"
 
-typedef void redisCommandProc(Connection* conn);
+typedef void RedisCommandProc(Connection* conn);
 
 struct RedisCommand {
     std::string name;
-    redisCommandProc* proc;
+    RedisCommandProc* proc;
     int flags;
     int argc;
 };
 
 void initRedisCommand(std::shared_ptr<RedisDB> db);
 
-RedisCommand* lookupCommand(std::string cmd);
+RedisCommand* LookupCommand(std::string cmd);
 #endif

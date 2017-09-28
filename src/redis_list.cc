@@ -12,13 +12,11 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
 
     RecordLock l(&mutex_list_record_, key);
 
-    std::shared_ptr<ListMeta> meta = GetOrCreateListMeta(key);
-
     int64_t addr;
-    s = InsertListMeta(key, meta, 0, &addr);
+
+    s = InsertListMetaAt(key, 0, &addr, llen);
 
     if (!s.ok()) {
-        meta->ResetBuffer();
         return s;
     }
 
@@ -28,110 +26,44 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
 
     s = list_->Put(rocksdb::WriteOptions(), leaf, val);
 
-    if (s.ok()) {
-        *llen = meta->Size();
-        metaqueue_.push(meta->ActionBuffer());
-    }
-    else {
-        meta->ResetBuffer();
-    }
+    assert(s.ok());
+    //写入失败就麻烦大了，内存索引已经修改无法回滚
 
     return s;
 }
 
-std::shared_ptr<ListMeta> RedisDB::GetOrCreateListMeta(const std::string& key)
+rocksdb::Status RedisDB::LLen(const std::string& key, int64_t* llen)
 {
-    std::string metakey = EncodeListMetaKey(key);
-    std::string metaval;
+    std::shared_ptr<ListMeta> meta = GetListMeta(key);
 
-    if (memmeta_.find(metakey) == memmeta_.end()) {
-        memmeta_[metakey] = std::shared_ptr<MetaBase>(new ListMeta(key, INIT));
+    if (meta == nullptr) {
+        *llen = 0;
     }
-
-    std::shared_ptr<ListMeta> meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
-
-    return meta;
-}
-
-std::shared_ptr<ListMeta> RedisDB::GetListMeta(const std::string& key)
-{
-    std::string metakey = EncodeListMetaKey(key);
-    std::string metaval;
-
-    if (memmeta_.find(metakey) == memmeta_.end()) {
-        return NULL;
+    else {
+        *llen = meta->Size();
     }
-
-    std::shared_ptr<ListMeta> meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
-
-    return meta;
-}
-
-std::shared_ptr<ListMetaBlock> RedisDB::GetOrCreateListMetaBlock(const std::string& key, int64_t addr)
-{
-    std::string blockkey = EncodeListBlockKey(key, addr);
-    std::string blockval;
-
-    if (memmeta_.find(blockkey) == memmeta_.end()) {
-        memmeta_[blockkey] = std::shared_ptr<MetaBase>(new ListMetaBlock(key, addr));
-    }
-
-    std::shared_ptr<ListMetaBlock> block = std::dynamic_pointer_cast<ListMetaBlock>(memmeta_[blockkey]);
-
-    return block;
-}
-
-rocksdb::Status RedisDB::InsertListMeta(const std::string& key, std::shared_ptr<ListMeta> meta, int64_t index, int64_t* addr)
-{
-    if (meta->IsElementsFull()) {
-        return rocksdb::Status::InvalidArgument("Maximum element size limited: " + std::to_string(meta->Size()));
-    }
-
-    if (index > meta->Size() || index < 0) {
-        return rocksdb::Status::InvalidArgument("index size beyond max index: " + std::to_string(index));
-    }
-
-    meta->IncrSize();
-
-    int blockidx = 0;
-    ListMetaBlockPtr* blockptr = meta->GetIndexBlockPtr(index, &blockidx);
-
-    if (blockptr == nullptr) {
-        if (index == 0) {
-            blockidx = 0;
-            blockptr = meta->InsertNewMetaBlockPtr(0);
-        }
-        else {
-            blockidx = meta->BSize();
-            blockptr = meta->InsertNewMetaBlockPtr(meta->BSize());
-        }
-    }
-
-    if (blockptr->size == LIST_BLOCK_KEYS) {
-        blockptr = meta->InsertNewMetaBlockPtr(blockidx);
-
-        if (blockptr == nullptr) {
-            return rocksdb::Status::InvalidArgument("Maximum block size limited: " + std::to_string(meta->BSize()));
-        }
-    }
-
-    if (blockptr->size == 0) {
-        blockptr->addr = meta->AllocArea();
-    }
-
-    std::shared_ptr<ListMetaBlock> block = GetOrCreateListMetaBlock(key, blockptr->addr);
-
-    block->Insert(index, blockptr->size, meta->AllocArea());
-    blockptr->size++;
-
-    *addr = meta->CurrentArea();
 
     return rocksdb::Status::OK();
 }
 
-rocksdb::Status RedisDB::LPop(const std::string& key, std::string* val)
+rocksdb::Status RedisDB::LPop(const std::string& key, std::string& val)
 {
     rocksdb::Status s;
+    int64_t addr;
+
+    s = RemoveListMetaAt(key, 0, &addr);
+
+    if (!s.ok()) return s;
+
+    std::string leaf = EncodeListValueKey(key, addr);
+
+    LOG_DEBUG << "get leaf: " << leaf;
+
+    s = list_->Get(rocksdb::ReadOptions(), leaf, &val);
+
+    if(!s.ok()) return s;
+
+    s = list_->Delete(rocksdb::WriteOptions(), leaf);
 
     return s;
 }

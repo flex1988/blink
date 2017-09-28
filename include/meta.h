@@ -46,24 +46,17 @@ class ListMeta : public MetaBase {
     bool IsBlocksFull() { return bsize_ == blimit_; };
     std::string key() { return key_; };
     int64_t Size() { return size_; };
-    void SetSize(int64_t size) { size_ = size; };
     int64_t BSize() { return bsize_; };
-    void SetBSize(int64_t size) { bsize_ = size; };
     void SetArea(uint64_t area) { area_index_ = area; };
-    int64_t IncrSize()
-    {
-        SaveAction(SIZE, ++size_, "");
-        return size_;
-    };
-    int64_t IncrBSize()
-    {
-        SaveAction(BSIZE, ++bsize_, "");
-        return bsize_;
-    };
+    int64_t IncrSize() { return size_++; };
+    void DecrSize() { size_--; };
+    int64_t IncrBSize() { return bsize_++; };
+    void DecrBSize() { bsize_--; }
     ListMetaBlockPtr* InsertNewMetaBlockPtr(int index);
     rocksdb::Status Insert(const std::string& key, uint64_t index, uint64_t* addr);
     bool operator==(const ListMeta& meta);
-    ListMetaBlockPtr* GetIndexBlockPtr(int64_t index, int* blockidx);
+    ListMetaBlockPtr* IfNeedCreateBlock(int64_t index, int* bidx);
+    ListMetaBlockPtr* BlockAtIndex(int64_t index, int* bidx);
 
    private:
     std::string key_;
@@ -81,21 +74,22 @@ class ListMeta : public MetaBase {
 
 class ListMetaBlock : public MetaBase {
    public:
-    ListMetaBlock(const std::string& key, int64_t addr) : self_addr_(addr), key_(key)
+    ListMetaBlock(const std::string& key, int64_t addr) : self_addr_(addr), key_(key), size_(0)
     {
         std::memset(addr_, 0, sizeof(int64_t) * LIST_BLOCK_KEYS);
         unique_ = EncodeListBlockKey(key, addr);
     }
 
-    ListMetaBlock(const std::string& str) : self_addr_(0) { str.copy((char*)addr_, sizeof(int64_t) * LIST_BLOCK_KEYS); }
+    ListMetaBlock(const std::string& str) : self_addr_(0), size_(0) { str.copy((char*)addr_, sizeof(int64_t) * LIST_BLOCK_KEYS); }
     virtual int64_t Size() { return size_; };
     virtual MetaType Type() { return LISTBLOCK; };
     virtual std::string Key() { return key_; };
     virtual std::string Serialize();
 
     int64_t FetchAddr(int64_t index) { return addr_[index]; };
-    void Insert(int index, int size, int val);
-    std::string GetUnique() { return unique_; };
+    int Remove(int index);
+    void Insert(int index, int val);
+
    private:
     int64_t addr_[LIST_BLOCK_KEYS];
     int64_t self_addr_;

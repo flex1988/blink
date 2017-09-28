@@ -1,10 +1,9 @@
 #include "common.h"
 #include "meta.h"
+#include "redis_db.h"
 
 ListMeta::ListMeta(const std::string& str, Action action)
 {
-    InitActionHeader();
-
     if (action == REINIT) {
         assert(str.at(0) == 'L');
         uint8_t klen = (int8_t)str.at(1);
@@ -24,12 +23,10 @@ ListMeta::ListMeta(const std::string& str, Action action)
         limit_ = LIST_ELEMENT_SIZE;
         bsize_ = 0;
         blimit_ = LIST_META_BLOCKS;
-        area_index_ = 0;
+        area_index_ = 1;
 
         std::memset(blocks_, 0, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS);
     }
-
-    SaveAction(action, str.size(), str);
 }
 
 std::string ListMeta::Serialize()
@@ -63,14 +60,12 @@ int ListMeta::AllocArea()
 ListMetaBlockPtr* ListMeta::InsertNewMetaBlockPtr(int index)
 {
     if (IsBlocksFull()) {
-        return NULL;
+        return nullptr;
     }
 
     if (index > bsize_ || index < 0) {
-        return NULL;
+        return nullptr;
     }
-
-    SaveAction(INSERT, static_cast<int16_t>(index), "");
 
     int cursor = bsize_;
     while (cursor > index) {
@@ -100,49 +95,235 @@ bool ListMeta::operator==(const ListMeta& meta)
     return true;
 }
 
-void ListMetaBlock::Insert(int index, int size, int val)
+void ListMetaBlock::Insert(int index, int val)
 {
-    int cursor = size;
+    int cursor = size_;
     while (cursor > index) {
         addr_[cursor] = addr_[cursor - 1];
         cursor--;
     }
     addr_[index] = val;
+
+    size_++;
+}
+
+int ListMetaBlock::Remove(int index)
+{
+    int cursor = index;
+    int val = addr_[index];
+
+    while (cursor < size_) {
+        addr_[cursor] = addr_[cursor + 1];
+        cursor++;
+    }
+
+    size_--;
+
+    return val;
 }
 
 std::string ListMetaBlock::Serialize()
 {
-    std::string unique = GetUnique();
-    assert(unique.size() > 0);
+    std::string key = Key();
+    assert(key.size() > 0);
 
-    uint16_t len = 2 + unique.size() + sizeof(int64_t) * LIST_BLOCK_KEYS + 2;
+    uint16_t len = 2 + key.size() + sizeof(int64_t) * LIST_BLOCK_KEYS + 2;
 
     std::string str;
     str.append(1, META_SNAP_MAGIC);
     str.append((char*)&len, 2);
     str.append(1, 'B');
-    str.append(1, unique.size());
-    str.append(unique.data(), unique.size());
+    str.append(1, key.size());
+    str.append(key.data(), key.size());
     str.append((char*)addr_, sizeof(int64_t) * LIST_BLOCK_KEYS);
     str.append("\r\n");
     return str;
 }
 
-ListMetaBlockPtr* ListMeta::GetIndexBlockPtr(int64_t index, int* blockidx)
+ListMetaBlockPtr* ListMeta::BlockAtIndex(int64_t index, int* bidx)
 {
-    ListMetaBlockPtr* blockptr;
+    ListMetaBlockPtr* blockptr = nullptr;
 
     int i = 0;
     for (; i < BSize(); i++) {
         blockptr = BlockAt(i);
 
         if (index < blockptr->size) {
-            *blockidx = i;
+            *bidx = index;
             return blockptr;
         }
-        else
+        else {
             index -= blockptr->size;
+        }
     }
 
-    return nullptr;
+    return blockptr;
+}
+
+ListMetaBlockPtr* ListMeta::IfNeedCreateBlock(int64_t index, int* bidx)
+{
+    ListMetaBlockPtr* blockptr = nullptr;
+    int blockidx;
+    int cursor = index;
+
+    int i = 0;
+    for (; i < BSize(); i++) {
+        blockptr = BlockAt(i);
+
+        if (cursor < blockptr->size) {
+            blockidx = i;
+            break;
+        }
+        else {
+            cursor -= blockptr->size;
+        }
+    }
+
+    *bidx = cursor;
+
+    // if block is not find, insert a new block
+    if (blockptr == nullptr) {
+        if (index == 0) {
+            blockidx = 0;
+            blockptr = InsertNewMetaBlockPtr(0);
+        }
+        else {
+            blockidx = BSize();
+            blockptr = InsertNewMetaBlockPtr(BSize());
+        }
+    }
+
+    // if block is full ,insert a new block
+    if (blockptr->size == LIST_BLOCK_KEYS) {
+        blockptr = InsertNewMetaBlockPtr(blockidx);
+
+        if (blockptr == nullptr) {
+            return nullptr;
+        }
+    }
+
+    // if block is new create, alloc the block
+    if (blockptr->addr == 0) {
+        blockptr->addr = AllocArea();
+    }
+
+    return blockptr;
+}
+
+std::shared_ptr<ListMeta> RedisDB::GetOrCreateListMeta(const std::string& key)
+{
+    std::string metakey = EncodeListMetaKey(key);
+    std::string metaval;
+
+    if (memmeta_.find(metakey) == memmeta_.end()) {
+        memmeta_[metakey] = std::shared_ptr<MetaBase>(new ListMeta(key, INIT));
+    }
+
+    std::shared_ptr<ListMeta> meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
+
+    return meta;
+}
+
+std::shared_ptr<ListMeta> RedisDB::GetListMeta(const std::string& key)
+{
+    std::string metakey = EncodeListMetaKey(key);
+    std::string metaval;
+
+    if (memmeta_.find(metakey) == memmeta_.end()) {
+        return nullptr;
+    }
+
+    std::shared_ptr<ListMeta> meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
+
+    return meta;
+}
+
+std::shared_ptr<ListMetaBlock> RedisDB::GetOrCreateListMetaBlock(const std::string& key, int64_t addr)
+{
+    std::string blockkey = EncodeListBlockKey(key, addr);
+    std::string blockval;
+
+    if (memmeta_.find(blockkey) == memmeta_.end()) {
+        memmeta_[blockkey] = std::shared_ptr<MetaBase>(new ListMetaBlock(key, addr));
+    }
+
+    std::shared_ptr<ListMetaBlock> block = std::dynamic_pointer_cast<ListMetaBlock>(memmeta_[blockkey]);
+
+    return block;
+}
+
+std::shared_ptr<ListMetaBlock> RedisDB::GetListMetaBlock(const std::string& key, int64_t addr)
+{
+    std::string blockkey = EncodeListBlockKey(key, addr);
+    std::string blockval;
+
+    if (memmeta_.find(blockkey) == memmeta_.end()) {
+        return nullptr;
+    }
+
+    std::shared_ptr<ListMetaBlock> block = std::dynamic_pointer_cast<ListMetaBlock>(memmeta_[blockkey]);
+
+    return block;
+}
+
+rocksdb::Status RedisDB::InsertListMetaAt(const std::string& key, int64_t index, int64_t* addr, int64_t* size)
+{
+    std::shared_ptr<ListMeta> meta = GetOrCreateListMeta(key);
+
+    if (meta->IsElementsFull()) {
+        return rocksdb::Status::InvalidArgument("Maximum element size limited: " + std::to_string(meta->Size()));
+    }
+
+    if (index > meta->Size() || index < 0) {
+        return rocksdb::Status::InvalidArgument("index size beyond max index: " + std::to_string(index));
+    }
+
+    int bidx;
+    ListMetaBlockPtr* blockptr = meta->IfNeedCreateBlock(index, &bidx);
+
+    if (blockptr == nullptr) {
+        return rocksdb::Status::InvalidArgument("Maximum block size limited: " + std::to_string(meta->BSize()));
+    }
+
+    std::shared_ptr<ListMetaBlock> block = GetOrCreateListMetaBlock(key, blockptr->addr);
+
+    block->Insert(bidx, meta->AllocArea());
+
+    blockptr->size++;
+
+    meta->IncrSize();
+
+    *addr = meta->CurrentArea();
+    *size = meta->Size();
+
+    return rocksdb::Status::OK();
+}
+
+rocksdb::Status RedisDB::RemoveListMetaAt(const std::string& key, int64_t index, int64_t* addr)
+{
+    std::shared_ptr<ListMeta> meta = GetListMeta(key);
+
+    if (meta == nullptr) return rocksdb::Status::OK();
+
+    if (index > meta->Size() || index < 0) {
+        return rocksdb::Status::InvalidArgument("index size beyond max index: " + std::to_string(index));
+    }
+
+    int bidx = 0;
+    ListMetaBlockPtr* blockptr = meta->BlockAtIndex(index, &bidx);
+
+    if (blockptr == nullptr) {
+        return rocksdb::Status::InvalidArgument("invalid index: " + std::to_string(index));
+    }
+
+    std::shared_ptr<ListMetaBlock> block = GetListMetaBlock(key, blockptr->addr);
+    assert(block != nullptr);
+
+    *addr = block->Remove(bidx);
+
+    blockptr->size--;
+
+    meta->DecrSize();
+
+    return rocksdb::Status::OK();
 }

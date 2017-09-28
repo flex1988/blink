@@ -12,7 +12,7 @@ static boost::unordered_map<std::string, RedisCommand> commands_;
 
 std::shared_ptr<RedisDB> redisdb_;
 
-static void getCommand(Connection* conn)
+static void GetCommand(Connection* conn)
 {
     std::string value;
     rocksdb::Status s = redisdb_->Get(conn->_argv[1], value);
@@ -31,7 +31,7 @@ static void getCommand(Connection* conn)
     conn->sendReplyBulk(value);
 }
 
-static void setCommand(Connection* conn)
+static void SetCommand(Connection* conn)
 {
     rocksdb::Status s = redisdb_->Set(conn->_argv[1], conn->_argv[2]);
 
@@ -44,7 +44,7 @@ static void setCommand(Connection* conn)
     conn->sendReply("+OK\r\n");
 }
 
-static void lPushCommand(Connection* conn)
+static void LPushCommand(Connection* conn)
 {
     int64_t size;
     rocksdb::Status s = redisdb_->LPush(conn->_argv[1], conn->_argv[2], &size);
@@ -58,7 +58,7 @@ static void lPushCommand(Connection* conn)
     conn->sendReplyLongLong(size);
 }
 
-static void lIndexCommand(Connection* conn)
+static void LIndexCommand(Connection* conn)
 {
     std::string val;
     rocksdb::Status s = redisdb_->LIndex(conn->_argv[1], std::stoi(conn->_argv[2], NULL, 0), &val);
@@ -72,7 +72,28 @@ static void lIndexCommand(Connection* conn)
     conn->sendReplyBulk(val);
 }
 
-static void sAddCommand(Connection* conn)
+static void LLenCommmand(Connection* conn)
+{
+    int64_t llen;
+    rocksdb::Status s = redisdb_->LLen(conn->_argv[1], &llen);
+    conn->sendReplyLongLong(llen);
+}
+
+static void LPopCommand(Connection* conn)
+{
+    std::string val;
+    rocksdb::Status s = redisdb_->LPop(conn->_argv[1], val);
+
+    if (!s.ok()) {
+        conn->sendReply("$-1\r\n");
+        LOG_ERROR << s.getState();
+        return;
+    }
+
+    conn->sendReplyBulk(val);
+}
+
+static void SAddCommand(Connection* conn)
 {
     int64_t ret = 0;
     int64_t size;
@@ -93,7 +114,7 @@ static void sAddCommand(Connection* conn)
     conn->sendReplyLongLong(ret);
 }
 
-static void sCardCommand(Connection* conn)
+static void SCardCommand(Connection* conn)
 {
     int64_t ret;
     rocksdb::Status s;
@@ -110,15 +131,17 @@ void initRedisCommand(std::shared_ptr<RedisDB> db)
     std::thread appender(&RedisDB::AppendMeta, redisdb_);
     appender.detach();
 
-    commands_["get"] = {"get", getCommand, 0, 2};
-    commands_["set"] = {"set", setCommand, 0, 3};
-    commands_["lpush"] = {"lpush", lPushCommand, 0, 3};
-    commands_["lindex"] = {"lindex", lIndexCommand, 0, 3};
-    commands_["sadd"] = {"sadd", sAddCommand, 0, 3};
-    commands_["scard"] = {"scard", sCardCommand, 0, 2};
+    commands_["get"] = {"get", GetCommand, 0, 2};
+    commands_["set"] = {"set", SetCommand, 0, 3};
+    commands_["lpush"] = {"lpush", LPushCommand, 0, 3};
+    commands_["lindex"] = {"lindex", LIndexCommand, 0, 3};
+    commands_["sadd"] = {"sadd", SAddCommand, 0, 3};
+    commands_["scard"] = {"scard", SCardCommand, 0, 2};
+    commands_["llen"] = {"llen", LLenCommmand, 0, 2};
+    commands_["lpop"] = {"lpop", LPopCommand, 0, 2};
 }
 
-RedisCommand* lookupCommand(std::string cmd)
+RedisCommand* LookupCommand(std::string cmd)
 {
     if (commands_.find(cmd) == commands_.end()) return NULL;
     return &commands_[cmd];

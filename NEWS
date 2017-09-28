@@ -11,3 +11,6 @@ meta和数据分开存，因为meta体大但是大小一样，适合用btree结�
 
 2017_9_27
 添加gtest单元测试，安逸
+
+2017_9_28
+把redis命令落aof meta snapshot 和 aof恢复数据

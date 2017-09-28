@@ -309,13 +309,13 @@ void RedisDB::ReloadListActionBuffer(char* buf, size_t blen)
                 break;
             }
             case SIZE:
-                meta->SetSize(op);
+                //meta->SetSize(op);
                 break;
             case ALLOC:
-                meta->SetArea(op);
+                //meta->SetArea(op);
                 break;
             case BSIZE:
-                meta->SetBSize(op);
+                //meta->SetBSize(op);
                 break;
             case INSERT:
                 meta->InsertNewMetaBlockPtr(op);
