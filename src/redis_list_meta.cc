@@ -32,15 +32,14 @@ ListMeta::ListMeta(const std::string& str, Action action)
 std::string ListMeta::Serialize()
 {
     std::string str;
-    std::string key = Key();
 
-    uint16_t len = 2 + key.size() + sizeof(int64_t) * 5 + sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS + 2;
+    uint16_t len = 2 + key_.size() + sizeof(int64_t) * 5 + sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS + 2;
 
-    str.append(1, META_SNAP_MAGIC);
+    str.append((char*)&META_SNAP_MAGIC, 1);
     str.append((char*)&len, 2);
     str.append(1, 'L');
-    str.append(1, key.size());
-    str.append(key.data(), key.size());
+    str.append(1, key_.size());
+    str.append(key_.data(), key_.size());
     str.append((char*)&size_, sizeof(int64_t));
     str.append((char*)&limit_, sizeof(int64_t));
     str.append((char*)&bsize_, sizeof(int64_t));
@@ -133,17 +132,19 @@ int ListMetaBlock::Remove(int index)
 
 std::string ListMetaBlock::Serialize()
 {
-    std::string key = Key();
-    assert(key.size() > 0);
+    assert(key_.size() > 0);
 
-    uint16_t len = 2 + key.size() + sizeof(int64_t) * LIST_BLOCK_KEYS + 2;
+    uint16_t len = 2 + key_.size() + 2 * sizeof(int64_t) + sizeof(int64_t) * LIST_BLOCK_KEYS + 2;
 
     std::string str;
-    str.append(1, META_SNAP_MAGIC);
+    str.append((char*)&META_SNAP_MAGIC, 1);
     str.append((char*)&len, 2);
     str.append(1, 'B');
-    str.append(1, key.size());
-    str.append(key.data(), key.size());
+    str.append(1, key_.size());
+    str.append(key_.data(), key_.size());
+    str.append((char*)&self_addr_, sizeof(int64_t));
+    str.append((char*)&size_, sizeof(int64_t));
+
     str.append((char*)addr_, sizeof(int64_t) * LIST_BLOCK_KEYS);
     str.append("\r\n");
     return str;

@@ -92,11 +92,10 @@ class ListMetaBlock : public MetaBase {
     void Insert(int index, int val);
 
    private:
-    int64_t addr_[LIST_BLOCK_KEYS];
     int64_t self_addr_;
-    std::string key_;
-    std::string unique_;
     int64_t size_;
+    std::string key_;
+    int64_t addr_[LIST_BLOCK_KEYS];
 };
 
 class SetMeta : public MetaBase {

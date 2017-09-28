@@ -33,7 +33,7 @@ static ssize_t ReadSync(int fd, char* buffer, ssize_t nread)
     }
 }
 
-static ssize_t ReadUntil(int fd, char* buffer, char target)
+static ssize_t ReadUntilChar(int fd, char* buffer, char target)
 {
     ssize_t nread = 0;
     ssize_t n;
@@ -49,6 +49,29 @@ static ssize_t ReadUntil(int fd, char* buffer, char target)
         }
     }
 }
+
+// static ssize_t ReadUntilU16(int fd, char* buffer, uint16_t target)
+//{
+// ssize_t nread = 0;
+// ssize_t n;
+
+// n = read(fd, buffer, 2);
+// if (n == -1 || n == 0 || n < 2) return n;
+
+// if (*(uint16_t*)buffer == target) return n;
+
+// for (;;) {
+// n = read(fd, buffer, 1);
+
+// if (n == -1 || n == 0) return n;
+
+// nread++;
+
+// if (buffer[0] == target) {
+// return nread;
+//}
+//}
+//}
 
 RedisDB::RedisDB(const std::string& path) : metaqueue_(), path_(path), meta_log_size_(0)
 {
@@ -140,7 +163,7 @@ void RedisDB::LoadMetaSnapshot()
     ssize_t ret;
 
     for (;;) {
-        ret = ReadUntil(fd, buffer, META_SNAP_MAGIC);
+        ret = ReadUntilChar(fd, buffer, META_SNAP_MAGIC);
         if (ret == 0 || ret == -1) goto end;
 
         ret = ReadSync(fd, buffer, 2);
@@ -152,6 +175,8 @@ void RedisDB::LoadMetaSnapshot()
 
         ret = ReadSync(fd, buffer, len);
         if (ret == 0 || ret == -1 || ret < len) goto end;
+
+        if (buffer[len - 2] != '\r' || buffer[len - 1] != '\n') goto end;
 
         switch (buffer[0]) {
             case 'L': {
@@ -165,8 +190,9 @@ void RedisDB::LoadMetaSnapshot()
             case 'B': {
                 LOG_INFO << "load list meta block";
                 uint8_t ulen = buffer[1];
-                std::string unique = std::string(buffer[2], ulen);
-                memmeta_[unique] =
+                std::string key = std::string(buffer[2], ulen);
+                std::string blockkey = EncodeListMetaBlockKey(key);
+                memmeta_[key] =
                     std::shared_ptr<MetaBase>(new ListMetaBlock(std::string(buffer[2 + unique.size()], sizeof(int64_t) * LIST_BLOCK_KEYS)));
                 break;
             }
