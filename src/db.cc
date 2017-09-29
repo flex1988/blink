@@ -1,7 +1,7 @@
 #include "db.h"
 #include "common.h"
-#include "meta.h"
 #include "list.h"
+#include "meta.h"
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -180,20 +180,20 @@ void RedisDB::LoadMetaSnapshot()
 
         switch (buffer[0]) {
             case 'L': {
-                LOG_INFO << "load list meta";
                 uint8_t klen = buffer[1];
                 std::string key = std::string(buffer[2], klen);
+                LOG_INFO << "load list meta: " << key;
                 std::string metakey = EncodeListMetaKey(key);
-                memmeta_[metakey] = std::shared_ptr<MetaBase>(new ListMeta(key, INIT));
+                memmeta_[metakey] = std::shared_ptr<MetaBase>(new ListMeta(std::string(buffer, len - 2), REINIT));
                 break;
             }
             case 'B': {
-                LOG_INFO << "load list meta block";
-                uint8_t ulen = buffer[1];
-                std::string key = std::string(buffer[2], ulen);
-                std::string blockkey = EncodeListMetaBlockKey(key);
-                memmeta_[key] =
-                    std::shared_ptr<MetaBase>(new ListMetaBlock(std::string(buffer[2 + unique.size()], sizeof(int64_t) * LIST_BLOCK_KEYS)));
+                uint8_t klen = buffer[1];
+                std::string key = std::string(buffer[2], klen);
+                int64_t addr = *(int64_t*)buffer[2 + klen];
+                LOG_INFO << "load list meta block: " << key;
+                std::string blockkey = EncodeListBlockKey(key, addr);
+                memmeta_[blockkey] = std::shared_ptr<MetaBase>(new ListMetaBlock(std::string(buffer, len - 2)));
                 break;
             }
             default:
@@ -237,7 +237,7 @@ void RedisDB::LoadMetaLog()
 
     for (;;) {
     header:
-        ret = ReadUntil(fd, buffer, ACTION_BUFFER_MAGIC);
+        ret = ReadUntilChar(fd, buffer, ACTION_BUFFER_MAGIC);
         if (ret == 0 || ret == -1) goto error;
 
         ret = ReadSync(fd, buffer, 2);

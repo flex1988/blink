@@ -1,6 +1,6 @@
 #include "common.h"
-#include "meta.h"
 #include "db.h"
+#include "meta.h"
 
 ListMeta::ListMeta(const std::string& str, Action action)
 {
@@ -128,6 +128,17 @@ int ListMetaBlock::Remove(int index)
     size_--;
 
     return val;
+}
+
+ListMetaBlock::ListMetaBlock(const std::string& str)
+{
+    assert(str.at(0) == 'B');
+    uint8_t klen = (int8_t)str.at(1);
+
+    key_ = std::string(str.substr(2, klen));
+    self_addr_ = *(int64_t*)str.at(2 + klen);
+    size_ = *(int64_t*)str.at(2 + klen + sizeof(int64_t));
+    std::memcpy(addr_, &str.at(2 + klen + sizeof(int64_t) * 2), sizeof(int64_t) * LIST_BLOCK_KEYS);
 }
 
 std::string ListMetaBlock::Serialize()

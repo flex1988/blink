@@ -80,7 +80,7 @@ class ListMetaBlock : public MetaBase {
         std::memset(addr_, 0, sizeof(int64_t) * LIST_BLOCK_KEYS);
     }
 
-    ListMetaBlock(const std::string& str) : self_addr_(0), size_(0) { str.copy((char*)addr_, sizeof(int64_t) * LIST_BLOCK_KEYS); }
+    ListMetaBlock(const std::string& str);
     virtual int64_t Size() { return size_; };
     virtual MetaType Type() { return LISTBLOCK; };
     virtual std::string Key() { return key_; };
