@@ -1,7 +1,7 @@
 #include "aof.h"
 #include "common.h"
 
-extern std::unique_ptr<Server> server_;
+extern std::shared_ptr<RedisDB> redisdb_;
 
 static void FeedAppendOnlyFile(std::vector<std::string>& argv)
 {
@@ -18,7 +18,7 @@ static void FeedAppendOnlyFile(std::vector<std::string>& argv)
         buf.append("\r\n");
     }
     
-    server_->db->metaqueue_.push(buf);
+    redisdb_->metaqueue_.push(buf);
 
     LOG_DEBUG << buf;
 }

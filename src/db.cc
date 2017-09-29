@@ -130,6 +130,7 @@ RedisDB::RedisDB(const std::string& path) : metaqueue_(), path_(path), meta_log_
 RedisDB::~RedisDB()
 {  // Close();
 }
+
 void RedisDB::AppendMeta()
 {
     while (1) {
@@ -199,7 +200,7 @@ void RedisDB::LoadMetaSnapshot()
                 uint8_t klen = buffer[1];
                 std::string key = std::string(buffer + 2, klen);
                 int64_t addr = *(int64_t*)(buffer + 2 + klen);
-                LOG_INFO << "load list meta block: " << key;
+                LOG_DEBUG << "load list meta block: " << key;
                 std::string blockkey = EncodeListBlockKey(key, addr);
                 memmeta_[blockkey] = std::shared_ptr<MetaBase>(new ListMetaBlock(std::string(buffer, len - 2)));
                 break;
@@ -270,6 +271,8 @@ void RedisDB::LoadMetaAppendonly()
             argv.push_back(std::string(buf, bulk_length));
         }
 
+        ReloadAppendOnlyCommand(argv);
+
         argv.clear();
     }
 
@@ -290,6 +293,8 @@ error:
 
 void RedisDB::CompactMeta()
 {
+    if(forbid_compact_) return;
+
     LOG_INFO << "Dump meta to disk!";
 
     // uint64_t truncate_size = meta_log_size_;
@@ -374,5 +379,22 @@ void RedisDB::ReloadListActionBuffer(char* buf, size_t blen)
                 LOG_INFO << "unknown action: " << action;
                 return;
         }
+    }
+}
+
+void RedisDB::ReloadAppendOnlyCommand(const std::vector<std::string>& argv)
+{
+    if (argv[0] == "lpush") {
+        LOG_DEBUG << "reload lpush: " << argv[1];
+
+        int64_t size;
+        LPush(argv[1], argv[2], &size);
+    }
+    else if (argv[0] == "lpop") {
+        std::string val;
+        LPop(argv[1], val);
+    }
+    else {
+        LOG_INFO << "reload appendonly corruption!";
     }
 }

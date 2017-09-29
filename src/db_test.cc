@@ -1,4 +1,5 @@
 #include "db.h"
+#include "aof.h"
 #include "gtest/gtest.h"
 #include "rocksdb/db.h"
 #include "rocksdb/options.h"
@@ -51,30 +52,67 @@ TEST_F(RedisDBTest, LIST)
     }
 }
 
+TEST_F(RedisDBTest, APPENDONLY)
+{
+    int64_t llen;
+    rocksdb::Status s;
+    std::string val;
+
+    db_->DisableCompact();
+
+    for (int i = 0; i < 1000; i++) {
+        for (int j = 0; j < 10; j++) {
+            s = db_->LPush("append" + std::to_string(i), std::to_string(j), &llen);
+            EXPECT_EQ(true, s.ok());
+
+            RedisCommand cmd = {"lpush", NULL, PROPAGATE_AOF, 3};
+            std::vector<std::string> argv = {"lpush", "append" + std::to_string(i), std::to_string(j)};
+
+            Propagate(&cmd, argv);
+        }
+    }
+
+    db_->ClearMemMeta();
+
+    db_->ReloadAof();
+    db_->LoadMetaAppendonly();
+    db_->ReloadAofDone();
+
+    for (int i = 0; i < 1000; i++) {
+        for (int j = 0; j < 10; j++) {
+            s = db_->LIndex("append" + std::to_string(i), j, &val);
+            EXPECT_EQ(true, s.ok());
+            EXPECT_EQ(std::to_string(9 - j), val);
+        }
+    }
+}
+
 TEST_F(RedisDBTest, COMPACT)
 {
     int64_t llen;
     rocksdb::Status s;
     std::string val;
 
+    db_->EnableCompact();
+
     for (int i = 0; i < 1000; i++) {
         for (int j = 0; j < 10; j++) {
-            s = db_->LPush(std::to_string(i), std::to_string(j), &llen);
+            s = db_->LPush("compact" + std::to_string(i), std::to_string(j), &llen);
             EXPECT_EQ(true, s.ok());
         }
     }
 
     db_->CompactMeta();
 
-    delete db_.get();
+    db_->ClearMemMeta();
 
-    db_ = std::shared_ptr<RedisDB>(new RedisDB("/tmp/db"));
+    db_->LoadMetaSnapshot();
 
     for (int i = 0; i < 1000; i++) {
-        for (int j = 0; j >= 0; j--) {
-            s = db_->LIndex(std::to_string(i), j, &val);
+        for (int j = 0; j < 10; j++) {
+            s = db_->LIndex("compact" + std::to_string(i), j, &val);
             EXPECT_EQ(true, s.ok());
-            EXPECT_EQ(std::to_string(j), val);
+            EXPECT_EQ(std::to_string(9 - j), val);
         }
     }
 }
