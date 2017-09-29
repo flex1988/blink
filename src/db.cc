@@ -50,28 +50,32 @@ static ssize_t ReadUntilChar(int fd, char* buffer, char target)
     }
 }
 
-// static ssize_t ReadUntilU16(int fd, char* buffer, uint16_t target)
-//{
-// ssize_t nread = 0;
-// ssize_t n;
+static ssize_t ReadLineSync(int fd, char* buffer, ssize_t size)
+{
+    ssize_t nread = 0;
+    int ret;
 
-// n = read(fd, buffer, 2);
-// if (n == -1 || n == 0 || n < 2) return n;
+    size--;
+    while (size) {
+        char c;
 
-// if (*(uint16_t*)buffer == target) return n;
+        ret = ReadSync(fd, &c, 1);
+        if (ret == -1 || ret == 0) return ret;
 
-// for (;;) {
-// n = read(fd, buffer, 1);
+        if (c == '\n') {
+            *buffer = '\0';
+            if (nread && *(buffer - 1) == '\r') *(buffer - 1) = '\0';
+            return nread;
+        }
+        else {
+            *buffer++ = c;
+            *buffer = '\0';
+            nread++;
+        }
+    }
 
-// if (n == -1 || n == 0) return n;
-
-// nread++;
-
-// if (buffer[0] == target) {
-// return nread;
-//}
-//}
-//}
+    return nread;
+}
 
 RedisDB::RedisDB(const std::string& path) : metaqueue_(), path_(path), meta_log_size_(0)
 {
@@ -113,14 +117,14 @@ RedisDB::RedisDB(const std::string& path) : metaqueue_(), path_(path), meta_log_
 
     msnap_ = path_ + "/meta.snapshot";
     mnewsnap_ = path_ + "/meta.snapshot.new";
-    mlog_ = path_ + "/meta.log";
+    aof_ = path_ + "/meta.appendonly";
 
     LOG_INFO << "Server now is ready to accept connection";
     LOG_INFO << "DB path: " + path_ + "/meta";
 
     LoadMeta();
 
-    metafd_ = ::open(std::string(path + "/meta.log").data(), O_CREAT | O_WRONLY | O_APPEND);
+    aof_fd_ = ::open(std::string(path + "/meta.appendonly").data(), O_CREAT | O_WRONLY | O_APPEND);
 }
 
 RedisDB::~RedisDB()
@@ -130,7 +134,7 @@ void RedisDB::AppendMeta()
 {
     while (1) {
         std::string meta = metaqueue_.pop();
-        size_t w = ::write(metafd_, meta.data(), meta.size());
+        size_t w = ::write(aof_fd_, meta.data(), meta.size());
         assert(w = meta.size());
         meta_log_size_ += w;
     }
@@ -145,8 +149,14 @@ void RedisDB::Close()
 void RedisDB::LoadMeta()
 {
     LOG_INFO << "Load meta info form disk file path: " + path_ + "/meta";
+
+    ReloadAof();
+
     LoadMetaSnapshot();
-    LoadMetaLog();
+
+    LoadMetaAppendonly();
+
+    ReloadAofDone();
 }
 
 void RedisDB::LoadMetaSnapshot()
@@ -171,8 +181,6 @@ void RedisDB::LoadMetaSnapshot()
 
         len = *(uint16_t*)(buffer);
 
-        LOG_INFO << "len: " << len;
-
         ret = ReadSync(fd, buffer, len);
         if (ret == 0 || ret == -1 || ret < len) goto end;
 
@@ -181,23 +189,24 @@ void RedisDB::LoadMetaSnapshot()
         switch (buffer[0]) {
             case 'L': {
                 uint8_t klen = buffer[1];
-                std::string key = std::string(buffer[2], klen);
-                LOG_INFO << "load list meta: " << key;
+                std::string key = std::string(buffer + 2, klen);
+                LOG_DEBUG << "load list meta: " << key;
                 std::string metakey = EncodeListMetaKey(key);
                 memmeta_[metakey] = std::shared_ptr<MetaBase>(new ListMeta(std::string(buffer, len - 2), REINIT));
                 break;
             }
             case 'B': {
                 uint8_t klen = buffer[1];
-                std::string key = std::string(buffer[2], klen);
-                int64_t addr = *(int64_t*)buffer[2 + klen];
+                std::string key = std::string(buffer + 2, klen);
+                int64_t addr = *(int64_t*)(buffer + 2 + klen);
                 LOG_INFO << "load list meta block: " << key;
                 std::string blockkey = EncodeListBlockKey(key, addr);
                 memmeta_[blockkey] = std::shared_ptr<MetaBase>(new ListMetaBlock(std::string(buffer, len - 2)));
                 break;
             }
             default:
-                LOG_INFO << "wrong meta snapshot";
+                LOG_INFO << "meta snapshot corruption is not allowed";
+                assert(0);
                 break;
         }
     }
@@ -220,52 +229,57 @@ end:
     return;
 }
 
-void RedisDB::LoadMetaLog()
+void RedisDB::LoadMetaAppendonly()
 {
-    int fd = ::open(mlog_.c_str(), O_RDONLY);
+    int fd = ::open(aof_.c_str(), O_RDONLY);
     if (fd < 0) {
-        LOG_INFO << "open meta log not exists!";
+        LOG_INFO << "open meta appendonly not exists!";
         return;
     }
 
-    char buffer[2048];
-    uint8_t msize;
-    ssize_t ret;
-    MetaType type;
+    size_t buflen = 1024;
+    size_t len;
+    int64_t bulks;
+    int64_t bulk_length;
+    std::vector<std::string> argv;
 
-    int load = 0;
+    char* buf = (char*)std::malloc(buflen);
 
-    for (;;) {
-    header:
-        ret = ReadUntilChar(fd, buffer, ACTION_BUFFER_MAGIC);
-        if (ret == 0 || ret == -1) goto error;
+    while (1) {
+        len = ReadLineSync(fd, buf, buflen);
+        if (len == -1 || len == 0 || buf[0] != '*') goto error;
 
-        ret = ReadSync(fd, buffer, 2);
-        if (ret == 0 || ret == -1 || ret < 2) goto error;
+        bulks = std::atoi(buf + 1);
 
-        type = static_cast<MetaType>(*buffer);
-        msize = *(uint8_t*)(buffer + 1);
+        LOG_DEBUG << "bulks number: " << bulks;
 
-        if (msize == 0) goto header;
+        while (bulks-- > 0) {
+            len = ReadLineSync(fd, buf, buflen);
+            if (len == -1 || len == 0 || buf[0] != '$') goto error;
 
-        ret = ReadSync(fd, buffer, msize + 2);
-        if (ret == -1 || ret < msize + 2) goto error;
+            bulk_length = std::atoi(buf + 1);
 
-        load++;
+            if (bulk_length + 2 > buflen) {
+                buflen = bulk_length + 2;
+                buf = (char*)std::realloc(buf, buflen);
+            }
 
-        switch (type) {
-            case LIST:
-                ReloadListActionBuffer(buffer, ret - 2);
+            len = ReadSync(fd, buf, bulk_length + 2);
+            if (len == -1 || len == 0 || len < bulk_length + 2) goto error;
+
+            argv.push_back(std::string(buf, bulk_length));
         }
+
+        argv.clear();
     }
 
 error:
-    if (ret == 0) {
-        LOG_INFO << "load meta log from disk success: " << load;
+    if (len == 0) {
+        LOG_INFO << "load meta log from disk success";
         return;
     }
 
-    if (ret == -1) {
+    if (len == -1) {
         LOG_INFO << "read meta log failed " << std::string(strerror(errno));
         return;
     }
@@ -287,6 +301,7 @@ void RedisDB::CompactMeta()
 
     for (auto i = memmeta_.begin(); i != memmeta_.end(); ++i) {
         std::string str = i->second->Serialize();
+        LOG_DEBUG << "compact: " << str;
         nwrite = ::write(snapfd, str.c_str(), str.size());
         assert(nwrite == str.size());
     }
@@ -297,8 +312,8 @@ void RedisDB::CompactMeta()
     rename(mnewsnap_.c_str(), msnap_.c_str());
     unlink(mnewsnap_.c_str());
 
-    fsync(metafd_);
-    ret = ftruncate(metafd_, 0);
+    fsync(aof_fd_);
+    ret = ftruncate(aof_fd_, 0);
 
     if (ret == -1) {
         LOG_INFO << std::string(strerror(errno));

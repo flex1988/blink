@@ -42,7 +42,7 @@ private:
 
     bool processMultibulkBuffer(muduo::net::Buffer* buf);
 
-    bool processCommand();
+    bool ExecuteCommand();
 
     bool splitQueryArgs(std::string);
 

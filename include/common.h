@@ -10,9 +10,9 @@
 
 #define KEY_MAX_LENGTH 255
 
-#define LIST_META_BLOCKS 1 << 12
+const uint16_t LIST_META_BLOCKS = 1 << 12;
 
-#define LIST_BLOCK_KEYS 1 << 12
+const uint16_t LIST_BLOCK_KEYS = 1 << 12;
 
 #define LIST_ELEMENT_SIZE 1 << 23
 
@@ -23,5 +23,7 @@
 #define ACTION_BUFFER_MAGIC 0x78
 
 const uint16_t META_SNAP_MAGIC = 0x56;
+
+const int16_t PROPAGATE_AOF = 1 << 0;
 
 #endif

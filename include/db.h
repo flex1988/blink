@@ -46,6 +46,10 @@ class RedisDB {
     void CompactMeta();
     void LoadMeta();
 
+    void ReloadAof() { reload_aof_ = true; };
+    void ReloadAofDone() { reload_aof_ = false; };
+    bool IsReloadingAof() { return reload_aof_; };
+
     Queue<std::string> metaqueue_;
 
    private:
@@ -62,7 +66,8 @@ class RedisDB {
     port::RecordMutex mutex_set_record_;
 
     void LoadMetaSnapshot();
-    void LoadMetaLog();
+    void LoadMetaAppendonly();
+
     void ReloadListActionBuffer(char* buf, size_t blen);
 
     rocksdb::Status InsertListMetaAt(const std::string& key, int64_t index, int64_t* addr, int64_t* size);
@@ -73,12 +78,15 @@ class RedisDB {
     std::shared_ptr<ListMeta> GetListMeta(const std::string& key);
     std::shared_ptr<ListMetaBlock> GetListMetaBlock(const std::string& key, int64_t addr);
 
-    int metafd_;
+    int aof_fd_;
+
     uint64_t meta_log_size_;
 
     std::mutex snap_mutex_;
     std::string msnap_;
     std::string mnewsnap_;
-    std::string mlog_;
+    std::string aof_;
+
+    bool reload_aof_;
 };
 #endif

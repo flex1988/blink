@@ -35,6 +35,8 @@ std::string ListMeta::Serialize()
 
     uint16_t len = 2 + key_.size() + sizeof(int64_t) * 5 + sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS + 2;
 
+    LOG_DEBUG << "serialize key: " << key_ << " len: " << len;
+
     str.append((char*)&META_SNAP_MAGIC, 1);
     str.append((char*)&len, 2);
     str.append(1, 'L');
@@ -136,8 +138,8 @@ ListMetaBlock::ListMetaBlock(const std::string& str)
     uint8_t klen = (int8_t)str.at(1);
 
     key_ = std::string(str.substr(2, klen));
-    self_addr_ = *(int64_t*)str.at(2 + klen);
-    size_ = *(int64_t*)str.at(2 + klen + sizeof(int64_t));
+    self_addr_ = *(int64_t*)&str.at(2 + klen);
+    size_ = *(int64_t*)&str.at(2 + klen + sizeof(int64_t));
     std::memcpy(addr_, &str.at(2 + klen + sizeof(int64_t) * 2), sizeof(int64_t) * LIST_BLOCK_KEYS);
 }
 

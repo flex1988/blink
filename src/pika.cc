@@ -6,6 +6,8 @@
 #include <muduo/net/EventLoopThread.h>
 #include <muduo/net/inspect/Inspector.h>
 
+std::unique_ptr<Server> server_;
+
 int main(int argc, char** argv)
 {
     std::string dbpath = "/tmp/db";
@@ -14,13 +16,13 @@ int main(int argc, char** argv)
 
     muduo::net::EventLoop loop;
 
-    Server server(&loop, dbpath);
+    server_ = std::unique_ptr<Server>(new Server(&loop, dbpath));
 
-    server.start();
+    server_->start();
 
-    //loop.runEvery(10, boost::bind(&RedisDB::CompactMeta, server.db));
+    //loop.runEvery(10, boost::bind(&RedisDB::CompactMeta, server_->db));
 
-    initRedisCommand(server.db);
+    InitRedisCommand(server_->db);
 
     loop.loop();
 

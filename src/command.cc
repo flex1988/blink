@@ -124,7 +124,7 @@ static void SCardCommand(Connection* conn)
     conn->sendReplyLongLong(ret);
 }
 
-void initRedisCommand(std::shared_ptr<RedisDB> db)
+void InitRedisCommand(std::shared_ptr<RedisDB> db)
 {
     redisdb_ = db;
 
@@ -132,13 +132,15 @@ void initRedisCommand(std::shared_ptr<RedisDB> db)
     appender.detach();
 
     commands_["get"] = {"get", GetCommand, 0, 2};
-    commands_["set"] = {"set", SetCommand, 0, 3};
-    commands_["lpush"] = {"lpush", LPushCommand, 0, 3};
+    commands_["set"] = {"set", SetCommand, PROPAGATE_AOF, 3};
+
+    commands_["lpush"] = {"lpush", LPushCommand, PROPAGATE_AOF, 3};
     commands_["lindex"] = {"lindex", LIndexCommand, 0, 3};
-    commands_["sadd"] = {"sadd", SAddCommand, 0, 3};
-    commands_["scard"] = {"scard", SCardCommand, 0, 2};
     commands_["llen"] = {"llen", LLenCommmand, 0, 2};
-    commands_["lpop"] = {"lpop", LPopCommand, 0, 2};
+    commands_["lpop"] = {"lpop", LPopCommand, PROPAGATE_AOF, 2};
+
+    commands_["sadd"] = {"sadd", SAddCommand, PROPAGATE_AOF, 3};
+    commands_["scard"] = {"scard", SCardCommand, 0, 2};
 }
 
 RedisCommand* LookupCommand(std::string cmd)

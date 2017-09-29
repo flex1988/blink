@@ -20,6 +20,8 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
         return s;
     }
 
+    if (IsReloadingAof()) return s;
+
     std::string leaf = EncodeListValueKey(key, addr);
 
     LOG_DEBUG << "set leaf: " << leaf;

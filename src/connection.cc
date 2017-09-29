@@ -1,6 +1,7 @@
 #include "connection.h"
-#include "common.h"
+#include "aof.h"
 #include "command.h"
+#include "common.h"
 #include "server.h"
 
 #include <muduo/base/Logging.h>
@@ -43,7 +44,7 @@ void Connection::onMessage(const muduo::net::TcpConnectionPtr& conn, muduo::net:
             reset();
         }
         else {
-            if (processCommand()) {
+            if (ExecuteCommand()) {
                 reset();
             }
         }
@@ -172,7 +173,7 @@ void Connection::reset()
     _bulklen = -1;
 }
 
-bool Connection::processCommand()
+bool Connection::ExecuteCommand()
 {
     if (_argv[0] == "quit") {
         sendReply("+OK\r\n");
@@ -200,6 +201,8 @@ bool Connection::processCommand()
     }
 
     cmd->proc(this);
+
+    Propagate(cmd, _argv);
 
     return true;
 }
