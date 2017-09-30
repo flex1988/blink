@@ -58,6 +58,20 @@ static void LPushCommand(Connection* conn)
     conn->sendReplyLongLong(size);
 }
 
+static void LPushXCommand(Connection* conn)
+{
+    int64_t size;
+    rocksdb::Status s = redisdb_->LPushX(conn->_argv[1], conn->_argv[2], &size);
+
+    if (!s.ok()) {
+        conn->sendReplyError("internal error");
+        LOG_ERROR << s.getState();
+        return;
+    }
+
+    conn->sendReplyLongLong(size);
+}
+
 static void LIndexCommand(Connection* conn)
 {
     std::string val;
@@ -135,6 +149,7 @@ void InitRedisCommand(std::shared_ptr<RedisDB> db)
     commands_["set"] = {"set", SetCommand, PROPAGATE_AOF, 3};
 
     commands_["lpush"] = {"lpush", LPushCommand, PROPAGATE_AOF, 3};
+    commands_["lpushx"] = {"lpushx", LPushXCommand, PROPAGATE_AOF, 3};
     commands_["lindex"] = {"lindex", LIndexCommand, 0, 3};
     commands_["llen"] = {"llen", LLenCommmand, 0, 2};
     commands_["lpop"] = {"lpop", LPopCommand, PROPAGATE_AOF, 2};
