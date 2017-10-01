@@ -72,6 +72,18 @@ static void LPushXCommand(Connection* conn)
     conn->sendReplyLongLong(size);
 }
 
+static void LRangeCommand(Connection* conn){
+    rocksdb::Status s = redisdb_->LRange(conn->);
+
+    if(!s.ok()) {
+        conn->sendReply("$-1\r\n");
+        LOG_ERROR<<s.getState();
+        return;
+    }
+
+    //conn->sendReplyMultiBulk();
+}
+
 static void LIndexCommand(Connection* conn)
 {
     std::string val;

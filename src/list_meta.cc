@@ -361,3 +361,9 @@ rocksdb::Status RedisDB::RemoveListMetaAt(const std::string& key, int64_t index,
 
     return rocksdb::Status::OK();
 }
+
+rocksdb::Status RedisDB::GetMetaRangeKeys(std::shared_ptr<ListMeta> meta, int start, int end, std::vector<rocksdb::Slice>& keys) {}
+
+rocksdb::Status RedisDB::GetMetaBlockRangeKeys(std::shared_ptr<ListMetaBlock> block, int start, int end, std::vector<rocksdb::Slice>& keys)
+{
+}

@@ -110,7 +110,6 @@ rocksdb::Status RedisDB::LPop(const std::string& key, std::string& val)
 rocksdb::Status RedisDB::LIndex(const std::string& key, const int64_t index, std::string* val)
 {
     rocksdb::Status s;
-
     int64_t cursor = index;
 
     RecordLock l(&mutex_list_record_, key);
@@ -147,4 +146,25 @@ rocksdb::Status RedisDB::LIndex(const std::string& key, const int64_t index, std
     }
 
     return rocksdb::Status::Corruption("get list element error");
+}
+
+rocksdb::Status RedisDB::LRange(const std::string& key, int start, int end, std::vector<std::string>& range)
+{
+    rocksdb::Status s;
+
+    RecordLock l(&mutex_list_record_, key);
+
+    std::shared_ptr<ListMeta> meta = GetListMeta(key);
+
+    if (start > meta->Size() - 1) {
+        return rocksdb::Status::OK();
+    }
+
+    if (end > meta->Size() - 1) {
+        end = meta->Size() - 1;
+    }
+
+    std::vector<rocksdb::Slice> keys;
+
+    
 }
