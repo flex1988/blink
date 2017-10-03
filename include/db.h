@@ -38,6 +38,7 @@ class RedisDB {
     rocksdb::Status LPop(const std::string& key, std::string& val);
     rocksdb::Status LIndex(const std::string& key, const int64_t index, std::string* val);
     rocksdb::Status LLen(const std::string& key, int64_t* llen);
+    rocksdb::Status LRange(const std::string& key, int start, int end, std::vector<std::string>& range);
 
     // SET
     rocksdb::Status SAdd(const std::string& key, const std::string& member, int64_t* res);
@@ -82,6 +83,9 @@ class RedisDB {
     std::shared_ptr<ListMetaBlock> GetOrCreateListMetaBlock(const std::string& key, int64_t addr);
     std::shared_ptr<ListMeta> GetListMeta(const std::string& key);
     std::shared_ptr<ListMetaBlock> GetListMetaBlock(const std::string& key, int64_t addr);
+
+    rocksdb::Status GetMetaRangeKeys(std::shared_ptr<ListMeta> meta, int start, int nums, std::vector<rocksdb::Slice>& keys);
+    rocksdb::Status GetMetaBlockRangeKeys(std::shared_ptr<ListMetaBlock> block, int start, int nums, std::vector<rocksdb::Slice>& keys);
 
     int aof_fd_;
 

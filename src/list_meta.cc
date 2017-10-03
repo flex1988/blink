@@ -362,22 +362,38 @@ rocksdb::Status RedisDB::RemoveListMetaAt(const std::string& key, int64_t index,
     return rocksdb::Status::OK();
 }
 
-rocksdb::Status RedisDB::GetMetaRangeKeys(std::shared_ptr<ListMeta> meta, int start, int end, std::vector<rocksdb::Slice>& keys)
+rocksdb::Status RedisDB::GetMetaRangeKeys(std::shared_ptr<ListMeta> meta, int start, int nums, std::vector<rocksdb::Slice>& keys)
 {
+    int index = 0;
     for (int i = 0; i < meta->BSize(); i++) {
+        if (nums == 0) break;
+
+        ListMetaBlockPtr* blockptr = meta->BlockAt(i);
+        index += blockptr->size;
+        if (start < index) {
+            int begin = start > (index - blockptr->size) ? start : 0;
+            int len = nums > blockptr->size ? blockptr->size : nums;
+
+            std::shared_ptr<ListMetaBlock> block = GetListMetaBlock(meta->Key(), blockptr->addr);
+
+            GetMetaBlockRangeKeys(block, begin, len, keys);
+
+            nums -= len;
+        }
     }
+
+    return rocksdb::Status::OK();
 }
-rocksdb::Status RedisDB::GetMetaBlockRangeKeys(std::shared_ptr<ListMetaBlock> block, int start, int end, std::vector<rocksdb::Slice>& keys)
+
+rocksdb::Status RedisDB::GetMetaBlockRangeKeys(std::shared_ptr<ListMetaBlock> block, int start, int nums, std::vector<rocksdb::Slice>& keys)
 {
-    assert(end >= start);
     assert(start >= 0);
+    assert(nums <= block->Size());
 
     if (start >= block->Size()) return rocksdb::Status::OK();
 
-    if (end >= block->Size()) end = block->Size() - 1;
-
-    for (int i = start; i <= end; i++) {
-        std::string blockkey = EncodeListBlockKey(block->FetchAddr(i));
+    while (nums--) {
+        std::string blockkey = EncodeListBlockKey(block->Key(), block->FetchAddr(static_cast<int64_t>(start--)));
         keys.push_back(blockkey);
     }
 
