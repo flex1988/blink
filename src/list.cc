@@ -150,8 +150,6 @@ rocksdb::Status RedisDB::LIndex(const std::string& key, const int64_t index, std
 
 rocksdb::Status RedisDB::LRange(const std::string& key, int start, int end, std::vector<std::string>& range)
 {
-    rocksdb::Status s;
-
     RecordLock l(&mutex_list_record_, key);
 
     std::shared_ptr<ListMeta> meta = GetListMeta(key);
@@ -166,5 +164,11 @@ rocksdb::Status RedisDB::LRange(const std::string& key, int start, int end, std:
 
     std::vector<rocksdb::Slice> keys;
 
-    
+    GetMetaRangeKeys(meta, start, end, keys);
+
+    std::vector<rocksdb::Status> s;
+
+    s = list_->MultiGet(rocksdb::ReadOptions(), keys, &range);
+
+    return rocksdb::Status::OK();
 }
