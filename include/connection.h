@@ -13,10 +13,11 @@
 #define PROTO_INLINE_MAX_SIZE (1024 * 64)
 #define PROTO_MBULK_BIG_ARG (1024 * 32)
 
+namespace blink {
 class Server;
 
 class Connection {
-public:
+   public:
     enum PROTO_REQ_TYPE { PROTO_NULL, PROTO_INLINE, PROTO_MULTIBULK };
 
     Connection(Server* owner, const muduo::net::TcpConnectionPtr& conn);
@@ -33,9 +34,11 @@ public:
 
     void setProtocolError(muduo::net::Buffer* buf, muduo::string msg, int pos);
 
+    void sendReplyMultiBulk(const std::vector<std::string> multi);
+
     std::vector<std::string> _argv;
 
-private:
+   private:
     void onMessage(const muduo::net::TcpConnectionPtr& conn, muduo::net::Buffer* buf, muduo::Timestamp);
 
     bool processInlineBuffer(muduo::net::Buffer* buf);
@@ -56,4 +59,5 @@ private:
     int _multibulklen;
     int _bulklen;
 };
+}
 #endif

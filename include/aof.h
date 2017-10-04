@@ -4,5 +4,7 @@
 #include <string>
 #include "command.h"
 
+namespace blink {
 void Propagate(RedisCommand* cmd, std::vector<std::string>& argv);
+}
 #endif

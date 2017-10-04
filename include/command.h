@@ -1,8 +1,10 @@
-#ifndef __PIKA_COMMAND__
-#define __PIKA_COMMAND__
+#ifndef __COMMAND_H__
+#define __COMMAND_H__
 
 #include "connection.h"
 #include "db.h"
+
+namespace blink {
 
 typedef void RedisCommandProc(Connection* conn);
 
@@ -16,4 +18,5 @@ struct RedisCommand {
 void InitRedisCommand(std::shared_ptr<RedisDB> db);
 
 RedisCommand* LookupCommand(std::string cmd);
+}
 #endif

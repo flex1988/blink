@@ -9,6 +9,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
 
+namespace blink {
 Connection::Connection(Server* owner, const muduo::net::TcpConnectionPtr& conn)
     : _owner(owner), _conn(conn), _reqtype(PROTO_NULL), _flags(0), _multibulklen(0), _bulklen(-1)
 {
@@ -239,4 +240,23 @@ bool Connection::splitQueryArgs(std::string req)
     }
 
     return true;
+}
+
+void Connection::sendReplyMultiBulk(const std::vector<std::string> multi)
+{
+    std::string buf;
+    buf.append(1, '*');
+    buf.append(std::to_string(multi.size()));
+    buf.append("\r\n");
+
+    for (auto const& v : multi) {
+        buf.append(1, '$');
+        buf.append(std::to_string(v.size()));
+        buf.append("\r\n");
+        buf.append(v);
+        buf.append("\r\n");
+    }
+
+    _conn->send(muduo::string(buf.c_str()));
+}
 }

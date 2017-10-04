@@ -8,6 +8,7 @@
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
 
+namespace blink {
 static boost::unordered_map<std::string, RedisCommand> commands_;
 
 std::shared_ptr<RedisDB> redisdb_;
@@ -84,7 +85,7 @@ static void LRangeCommand(Connection* conn)
         return;
     }
 
-    // conn->sendReplyMultiBulk();
+    conn->sendReplyMultiBulk(range);
 }
 
 static void LIndexCommand(Connection* conn)
@@ -168,6 +169,7 @@ void InitRedisCommand(std::shared_ptr<RedisDB> db)
     commands_["lindex"] = {"lindex", LIndexCommand, 0, 3};
     commands_["llen"] = {"llen", LLenCommmand, 0, 2};
     commands_["lpop"] = {"lpop", LPopCommand, PROPAGATE_AOF, 2};
+    commands_["lrange"] = {"lrange", LRangeCommand, 0, 4};
 
     commands_["sadd"] = {"sadd", SAddCommand, PROPAGATE_AOF, 3};
     commands_["scard"] = {"scard", SCardCommand, 0, 2};
@@ -177,4 +179,5 @@ RedisCommand* LookupCommand(std::string cmd)
 {
     if (commands_.find(cmd) == commands_.end()) return NULL;
     return &commands_[cmd];
+}
 }

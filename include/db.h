@@ -84,8 +84,8 @@ class RedisDB {
     std::shared_ptr<ListMeta> GetListMeta(const std::string& key);
     std::shared_ptr<ListMetaBlock> GetListMetaBlock(const std::string& key, int64_t addr);
 
-    rocksdb::Status GetMetaRangeKeys(std::shared_ptr<ListMeta> meta, int start, int nums, std::vector<rocksdb::Slice>& keys);
-    rocksdb::Status GetMetaBlockRangeKeys(std::shared_ptr<ListMetaBlock> block, int start, int nums, std::vector<rocksdb::Slice>& keys);
+    void GetMetaRangeKeys(std::shared_ptr<ListMeta> meta, int start, int nums, std::vector<std::string>& keys);
+    void GetMetaBlockRangeKeys(std::shared_ptr<ListMetaBlock> block, int start, int nums, std::vector<std::string>& keys);
 
     int aof_fd_;
 

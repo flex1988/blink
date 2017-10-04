@@ -6,7 +6,7 @@
 #include <muduo/net/EventLoopThread.h>
 #include <muduo/net/inspect/Inspector.h>
 
-std::unique_ptr<Server> server_;
+std::unique_ptr<blink::Server> server_;
 
 int main(int argc, char** argv)
 {
@@ -16,13 +16,13 @@ int main(int argc, char** argv)
 
     muduo::net::EventLoop loop;
 
-    server_ = std::unique_ptr<Server>(new Server(&loop, dbpath));
+    server_ = std::unique_ptr<blink::Server>(new blink::Server(&loop, dbpath));
 
     server_->start();
 
-    //loop.runEvery(10, boost::bind(&RedisDB::CompactMeta, server_->db));
+    // loop.runEvery(10, boost::bind(&RedisDB::CompactMeta, server_->db));
 
-    InitRedisCommand(server_->db);
+    blink::InitRedisCommand(server_->db);
 
     loop.loop();
 

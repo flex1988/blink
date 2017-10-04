@@ -17,10 +17,11 @@ namespace boost {
 inline std::size_t hash_value(const muduo::string& x) { return hash_range(x.begin(), x.end()); }
 }
 
+namespace blink {
 class Connection;
 
 class Server {
-public:
+   public:
     Server(muduo::net::EventLoop* loop, std::string path);
     ~Server();
 
@@ -29,7 +30,7 @@ public:
 
     std::shared_ptr<RedisDB> db;
 
-private:
+   private:
     muduo::net::TcpServer _server;
     muduo::net::EventLoop* _loop;
 
@@ -38,4 +39,5 @@ private:
     boost::unordered_map<muduo::string, boost::shared_ptr<Connection>> _conn_map;
     mutable muduo::MutexLock _mutex;
 };
+}
 #endif

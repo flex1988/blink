@@ -162,13 +162,19 @@ rocksdb::Status RedisDB::LRange(const std::string& key, int start, int end, std:
         end = meta->Size() - 1;
     }
 
-    std::vector<rocksdb::Slice> keys;
+    LOG_DEBUG << "LRANGE start: " << start << " end: " << end;
 
-    GetMetaRangeKeys(meta, start, end, keys);
+    std::vector<std::string> keys;
 
-    std::vector<rocksdb::Status> s;
+    std::vector<rocksdb::Slice> kslices;
 
-    s = list_->MultiGet(rocksdb::ReadOptions(), keys, &range);
+    GetMetaRangeKeys(meta, start, end - start + 1, keys);
+
+    for (auto k : keys) {
+        kslices.push_back(k);
+    }
+
+    auto s = list_->MultiGet(rocksdb::ReadOptions(), kslices, &range);
 
     return rocksdb::Status::OK();
 }

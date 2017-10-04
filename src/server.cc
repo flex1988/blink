@@ -8,6 +8,8 @@
 
 #include <boost/bind.hpp>
 
+namespace blink {
+
 Server::Server(muduo::net::EventLoop* loop, std::string path) : _server(loop, muduo::net::InetAddress(1234), "blink"), _loop(loop)
 {
     _server.setConnectionCallback(boost::bind(&Server::onConnection, this, _1));
@@ -30,4 +32,5 @@ void Server::onConnection(const muduo::net::TcpConnectionPtr& conn)
         muduo::MutexLockGuard lock(_mutex);
         _conn_map.erase(conn->name());
     }
+}
 }

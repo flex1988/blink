@@ -65,10 +65,10 @@ TEST_F(RedisDBTest, APPENDONLY)
             s = db_->LPush("append" + std::to_string(i), std::to_string(j), &llen);
             EXPECT_EQ(true, s.ok());
 
-            RedisCommand cmd = {"lpush", NULL, PROPAGATE_AOF, 3};
+            blink::RedisCommand cmd = {"lpush", NULL, PROPAGATE_AOF, 3};
             std::vector<std::string> argv = {"lpush", "append" + std::to_string(i), std::to_string(j)};
 
-            Propagate(&cmd, argv);
+            blink::Propagate(&cmd, argv);
         }
     }
 
