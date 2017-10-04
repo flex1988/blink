@@ -8,14 +8,14 @@ tests = \
 
 .PHONY: all
 
-all: pika $(obj) $(test)
+all: blink $(obj) $(test)
 
 CC := g++
 
 CFLAGS := -g -lmuduo_net_cpp11 -lmuduo_base_cpp11 -lrocksdb -lz -lbz2 -lgtest -pthread -Iinclude -std=c++11 -Wall
 
-pika: $(obj)
-	$(CC) -o build/pika src/pika.cc $(wildcard build/*.o) $(CFLAGS)
+blink: $(obj)
+	$(CC) -o build/blink src/blink.cc $(wildcard build/*.o) $(CFLAGS)
 
 check: $(tests)
 	@rm -rf /tmp/db
