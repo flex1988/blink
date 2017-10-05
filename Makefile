@@ -24,10 +24,10 @@ check: $(tests)
 	@for t in $(notdir $(tests)); do echo "***** Running $$t"; $(build_dir)/$$t || exit 1; done
 
 $(build_dir)/db_test: $(obj)
-	$(CC) src/db_test.cc $(obj) $(CFLAGS) -o $(build_dir)/db_test
+	$(CC) test/db_test.cc $(obj) $(CFLAGS) -o $(build_dir)/db_test
 
 $(build_dir)/meta_test: $(obj)
-	$(CC) src/meta_test.cc $(obj) $(CFLAGS) -o $(build_dir)/meta_test
+	$(CC) test/meta_test.cc $(obj) $(CFLAGS) -o $(build_dir)/meta_test
 
 $(build_dir)/%.o: src/%.cc
 	@test -d build || mkdir -p build

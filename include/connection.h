@@ -10,11 +10,6 @@
 #include <boost/bind.hpp>
 #include <boost/tokenizer.hpp>
 
-//#define CONN_CLOSE_AFTER_REPLY (1 << 6)
-
-//#define PROTO_INLINE_MAX_SIZE (1024 * 64)
-//#define PROTO_MBULK_BIG_ARG (1024 * 32)
-
 namespace blink {
 class Server;
 class Request;
