@@ -22,20 +22,14 @@ class Connection {
   public:
     friend class Request;
 
-    enum PROTO_REQ_TYPE { PROTO_NULL, PROTO_INLINE, PROTO_MULTIBULK };
-
     Connection(Server* owner, const muduo::net::TcpConnectionPtr& conn);
 
     ~Connection();
-
-    void setProtocolError(muduo::net::Buffer* buf, muduo::string msg, int pos);
 
   private:
     void onMessage(const muduo::net::TcpConnectionPtr& conn, muduo::net::Buffer* buf, muduo::Timestamp);
 
     bool ExecuteCommand();
-
-    bool splitQueryArgs(std::string);
 
     Request* request_;
 
