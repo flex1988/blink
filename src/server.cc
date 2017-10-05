@@ -19,8 +19,11 @@ Server::Server(muduo::net::EventLoop* loop, std::string path) : _server(loop, mu
 }
 
 Server::~Server() {}
+
 void Server::start() { _server.start(); }
+
 void Server::stop() { _loop->quit(); }
+
 void Server::onConnection(const muduo::net::TcpConnectionPtr& conn)
 {
     if (conn->connected()) {

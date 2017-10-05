@@ -1,6 +1,6 @@
 build_dir := build
 
-obj := $(build_dir)/server.o $(build_dir)/connection.o $(build_dir)/port.o $(build_dir)/command.o $(build_dir)/db.o $(build_dir)/kv.o $(build_dir)/list.o $(build_dir)/list_meta.o $(build_dir)/set.o $(build_dir)/set_meta.o $(build_dir)/hash.o $(build_dir)/meta_base.o $(build_dir)/aof.o $(build_dir)/protocol.o $(build_dir)/response.o
+obj := $(build_dir)/server.o $(build_dir)/connection.o $(build_dir)/port.o $(build_dir)/command.o $(build_dir)/db.o $(build_dir)/kv.o $(build_dir)/list.o $(build_dir)/list_meta.o $(build_dir)/set.o $(build_dir)/set_meta.o $(build_dir)/hash.o $(build_dir)/meta_base.o $(build_dir)/aof.o $(build_dir)/request.o $(build_dir)/response.o
 
 
 tests = \
