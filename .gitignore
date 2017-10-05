@@ -2,3 +2,4 @@ build
 tags
 *.o
 db
+*.out
