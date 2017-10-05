@@ -1,17 +1,20 @@
 #ifndef __PROTOCOL_H__
 #define __PROTOCOL_H__
 
+#include "common.h"
+
+#include <muduo/net/TcpConnection.h>
+
 namespace blink {
-class BufferParser {
+class BodyParser {
    public:
-    BufferParser();
-    ~BufferParser();
+    BodyParser();
+    ~BodyParser();
 
-    bool ProcessInlineBuffer(muduo::net::Buffer* buf);
+    bool ProcessInlineBuffer();
     bool ProcessMultibulkBuffer(muduo::net::Buffer* buf);
-    bool ExecuteCommand();
-
     bool SplitQueryArgs(std::string param);
+
     void Reset();
 
    private:

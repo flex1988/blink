@@ -52,40 +52,40 @@ TEST_F(RedisDBTest, LIST)
     }
 }
 
-TEST_F(RedisDBTest, APPENDONLY)
-{
-    int64_t llen;
-    rocksdb::Status s;
-    std::string val;
+// TEST_F(RedisDBTest, APPENDONLY)
+//{
+// int64_t llen;
+// rocksdb::Status s;
+// std::string val;
 
-    db_->DisableCompact();
+// db_->DisableCompact();
 
-    for (int i = 0; i < 1000; i++) {
-        for (int j = 0; j < 10; j++) {
-            s = db_->LPush("append" + std::to_string(i), std::to_string(j), &llen);
-            EXPECT_EQ(true, s.ok());
+// for (int i = 0; i < 1000; i++) {
+// for (int j = 0; j < 10; j++) {
+// s = db_->LPush("append" + std::to_string(i), std::to_string(j), &llen);
+// EXPECT_EQ(true, s.ok());
 
-            blink::RedisCommand cmd = {"lpush", NULL, PROPAGATE_AOF, 3};
-            std::vector<std::string> argv = {"lpush", "append" + std::to_string(i), std::to_string(j)};
+// blink::RedisCommand cmd = {"lpush", NULL, PROPAGATE_AOF, 3};
+// std::vector<std::string> argv = {"lpush", "append" + std::to_string(i), std::to_string(j)};
 
-            blink::Propagate(&cmd, argv);
-        }
-    }
+// blink::Propagate(&cmd, argv);
+//}
+//}
 
-    db_->ClearMemMeta();
+// db_->ClearMemMeta();
 
-    db_->ReloadAof();
-    db_->LoadMetaAppendonly();
-    db_->ReloadAofDone();
+// db_->ReloadAof();
+// db_->LoadMetaAppendonly();
+// db_->ReloadAofDone();
 
-    for (int i = 0; i < 1000; i++) {
-        for (int j = 0; j < 10; j++) {
-            s = db_->LIndex("append" + std::to_string(i), j, &val);
-            EXPECT_EQ(true, s.ok());
-            EXPECT_EQ(std::to_string(9 - j), val);
-        }
-    }
-}
+// for (int i = 0; i < 1000; i++) {
+// for (int j = 0; j < 10; j++) {
+// s = db_->LIndex("append" + std::to_string(i), j, &val);
+// EXPECT_EQ(true, s.ok());
+// EXPECT_EQ(std::to_string(9 - j), val);
+//}
+//}
+//}
 
 TEST_F(RedisDBTest, COMPACT)
 {

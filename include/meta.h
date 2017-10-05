@@ -9,15 +9,15 @@ enum MetaType { LIST, LISTBLOCK, SET };
 enum Action { DEFAULT, INIT, REINIT, UNIQUE, SIZE, BSIZE, INSERT, ALLOC };
 
 struct ListMetaBlockPtr {
-    int32_t addr;  // meta item address
-    int32_t size;  // meta item contain keys
+    int32_t addr; // meta item address
+    int32_t size; // meta item contain keys
 };
 
 class MetaBase {
-   public:
+  public:
     MetaBase() = default;
     std::string ActionBuffer();
-    void SaveAction(Action action, int16_t op, const std::string& str);
+    void SaveAction(Action action, int16_t op, const std::string &str);
     void InitActionHeader();
     void ResetBuffer();
 
@@ -26,20 +26,20 @@ class MetaBase {
     virtual std::string Key() = 0;
     virtual std::string Serialize() = 0;
 
-   private:
+  private:
     std::string action_buffer_;
 };
 
 class ListMeta : public MetaBase {
-   public:
-    ListMeta(const std::string&, Action);
+  public:
+    ListMeta(const std::string &, Action);
     ~ListMeta() = default;
 
     virtual MetaType Type() { return LIST; };
     virtual std::string Key() { return key_; };
     virtual std::string Serialize();
 
-    ListMetaBlockPtr* BlockAt(int index) { return &blocks_[index]; };
+    ListMetaBlockPtr *BlockAt(int index) { return &blocks_[index]; };
     int AllocArea();
     int CurrentArea() { return area_index_ - 1; };
     bool IsElementsFull() { return size_ == limit_; };
@@ -52,14 +52,14 @@ class ListMeta : public MetaBase {
     void DecrSize() { size_--; };
     int64_t IncrBSize() { return bsize_++; };
     void DecrBSize() { bsize_--; }
-    ListMetaBlockPtr* InsertNewMetaBlockPtr(int index);
-    rocksdb::Status Insert(const std::string& key, uint64_t index, uint64_t* addr);
-    bool operator==(const ListMeta& meta);
-    ListMetaBlockPtr* IfNeedCreateBlock(int64_t index, int* bidx);
-    ListMetaBlockPtr* BlockAtIndex(int64_t index, int* idx, int* bidx);
+    ListMetaBlockPtr *InsertNewMetaBlockPtr(int index);
+    rocksdb::Status Insert(const std::string &key, uint64_t index, uint64_t *addr);
+    bool operator==(const ListMeta &meta);
+    ListMetaBlockPtr *IfNeedCreateBlock(int64_t index, int *bidx);
+    ListMetaBlockPtr *BlockAtIndex(int64_t index, int *idx, int *bidx);
     void RemoveBlockAt(int index);
 
-   private:
+  private:
     std::string key_;
 
     int64_t size_;
@@ -74,13 +74,13 @@ class ListMeta : public MetaBase {
 };
 
 class ListMetaBlock : public MetaBase {
-   public:
-    ListMetaBlock(const std::string& key, int64_t addr) : self_addr_(addr), size_(0), key_(key)
+  public:
+    ListMetaBlock(const std::string &key, int64_t addr) : self_addr_(addr), size_(0), key_(key)
     {
         std::memset(addr_, 0, sizeof(int64_t) * LIST_BLOCK_KEYS);
     }
 
-    ListMetaBlock(const std::string& str);
+    ListMetaBlock(const std::string &str);
     virtual int64_t Size() { return size_; };
     virtual MetaType Type() { return LISTBLOCK; };
     virtual std::string Key() { return key_; };
@@ -90,7 +90,7 @@ class ListMetaBlock : public MetaBase {
     int Remove(int index);
     void Insert(int index, int val);
 
-   private:
+  private:
     int64_t self_addr_;
     int64_t size_;
     std::string key_;
@@ -98,8 +98,8 @@ class ListMetaBlock : public MetaBase {
 };
 
 class SetMeta : public MetaBase {
-   public:
-    SetMeta(const std::string& key);
+  public:
+    SetMeta(const std::string &key);
     ~SetMeta();
 
     virtual MetaType Type() { return SET; };
@@ -109,10 +109,10 @@ class SetMeta : public MetaBase {
     int64_t IncrSize() { return size_++; };
     int64_t Size() { return size_; };
     bool IsSetFull() { return size_ == limit_; }
-    void BFAdd(const std::string& member);
-    bool BFNotExists(const std::string& member);
+    void BFAdd(const std::string &member);
+    bool BFNotExists(const std::string &member);
 
-   private:
+  private:
     int64_t size_;
     int64_t limit_;
     std::string key_;

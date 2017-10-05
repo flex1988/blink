@@ -1,6 +1,8 @@
 #ifndef __CONNECTION_H__
 #define __CONNECTION_H__
 
+#include "protocol.h"
+#include "response.h"
 #include "server.h"
 
 #include <muduo/net/TcpConnection.h>
@@ -17,28 +19,16 @@ namespace blink {
 class Server;
 
 class Connection {
-   public:
+  public:
     enum PROTO_REQ_TYPE { PROTO_NULL, PROTO_INLINE, PROTO_MULTIBULK };
 
     Connection(Server* owner, const muduo::net::TcpConnectionPtr& conn);
 
     ~Connection();
 
-    void sendReply(const std::string& msg);
-
-    void sendReplyBulk(const std::string& value);
-
-    void sendReplyError(const std::string& msg);
-
-    void sendReplyLongLong(int64_t val);
-
     void setProtocolError(muduo::net::Buffer* buf, muduo::string msg, int pos);
 
-    void sendReplyMultiBulk(const std::vector<std::string> multi);
-
-    std::vector<std::string> _argv;
-
-   private:
+  private:
     void onMessage(const muduo::net::TcpConnectionPtr& conn, muduo::net::Buffer* buf, muduo::Timestamp);
 
     bool processInlineBuffer(muduo::net::Buffer* buf);
@@ -51,9 +41,15 @@ class Connection {
 
     void reset();
 
+    BodyParser* parser_;
+
+    Response* response_;
+
     Server* _owner;
     muduo::net::TcpConnectionPtr _conn;
     enum PROTO_REQ_TYPE _reqtype;
+
+    std::vector<std::string> _argv;
 
     int _flags;
     int _multibulklen;

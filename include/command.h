@@ -6,7 +6,7 @@
 
 namespace blink {
 
-typedef void RedisCommandProc(Connection* conn);
+typedef void RedisCommandProc(Response* rsp, std::vector<std::string> argv);
 
 struct RedisCommand {
     std::string name;

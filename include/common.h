@@ -26,4 +26,9 @@ const uint16_t META_SNAP_MAGIC = 0x56;
 
 const int16_t PROPAGATE_AOF = 1 << 0;
 
+const int32_t CONN_CLOSE_AFTER_REPLY = 1 << 6;
+
+const int32_t PROTO_INLINE_MAX_SIZE = 1024 * 64;
+const int32_t PROTO_MBULK_BIG_ARG = 1024 * 32;
+
 #endif

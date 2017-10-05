@@ -13,145 +13,145 @@ static boost::unordered_map<std::string, RedisCommand> commands_;
 
 std::shared_ptr<RedisDB> redisdb_;
 
-static void GetCommand(Connection* conn)
+static void GetCommand(Response* rsp, std::vector<std::string> argv)
 {
     std::string value;
-    rocksdb::Status s = redisdb_->Get(conn->_argv[1], value);
+    rocksdb::Status s = redisdb_->Get(argv[1], value);
 
     if (s.code() == rocksdb::Status::kNotFound) {
-        conn->sendReply("$-1\r\n");
+        rsp->SendReply("$-1\r\n");
         return;
     }
 
     if (!s.ok()) {
-        conn->sendReplyError("interval error");
+        rsp->SendReplyError("interval error");
         LOG_ERROR << s.getState();
         return;
     }
 
-    conn->sendReplyBulk(value);
+    rsp->SendReplyBulk(value);
 }
 
-static void SetCommand(Connection* conn)
+static void SetCommand(Response* rsp, std::vector<std::string> argv)
 {
-    rocksdb::Status s = redisdb_->Set(conn->_argv[1], conn->_argv[2]);
+    rocksdb::Status s = redisdb_->Set(argv[1], argv[2]);
 
     if (!s.ok()) {
-        conn->sendReplyError("internal error");
+        rsp->SendReplyError("internal error");
         LOG_ERROR << s.getState();
         return;
     }
 
-    conn->sendReply("+OK\r\n");
+    rsp->SendReply("+OK\r\n");
 }
 
-static void LPushCommand(Connection* conn)
-{
-    int64_t size;
-    rocksdb::Status s = redisdb_->LPush(conn->_argv[1], conn->_argv[2], &size);
-
-    if (!s.ok()) {
-        conn->sendReplyError("internal error");
-        LOG_ERROR << s.getState();
-        return;
-    }
-
-    conn->sendReplyLongLong(size);
-}
-
-static void LPushXCommand(Connection* conn)
+static void LPushCommand(Response* rsp, std::vector<std::string> argv)
 {
     int64_t size;
-    rocksdb::Status s = redisdb_->LPushX(conn->_argv[1], conn->_argv[2], &size);
+    rocksdb::Status s = redisdb_->LPush(argv[1], argv[2], &size);
 
     if (!s.ok()) {
-        conn->sendReplyError("internal error");
+        rsp->SendReplyError("internal error");
         LOG_ERROR << s.getState();
         return;
     }
 
-    conn->sendReplyLongLong(size);
+    rsp->SendReplyLongLong(size);
 }
 
-static void LRangeCommand(Connection* conn)
+static void LPushXCommand(Response* rsp, std::vector<std::string> argv)
+{
+    int64_t size;
+    rocksdb::Status s = redisdb_->LPushX(argv[1], argv[2], &size);
+
+    if (!s.ok()) {
+        rsp->SendReplyError("internal error");
+        LOG_ERROR << s.getState();
+        return;
+    }
+
+    rsp->SendReplyLongLong(size);
+}
+
+static void LRangeCommand(Response* rsp, std::vector<std::string> argv)
 {
     std::vector<std::string> range;
 
-    rocksdb::Status s = redisdb_->LRange(conn->_argv[1], std::atoi(conn->_argv[2].c_str()), std::atoi(conn->_argv[3].c_str()), range);
+    rocksdb::Status s = redisdb_->LRange(argv[1], std::atoi(argv[2].c_str()), std::atoi(argv[3].c_str()), range);
 
     if (!s.ok()) {
-        conn->sendReply("$-1\r\n");
+        rsp->SendReply("$-1\r\n");
         LOG_ERROR << s.getState();
         return;
     }
 
-    conn->sendReplyMultiBulk(range);
+    rsp->SendReplyMultiBulk(range);
 }
 
-static void LIndexCommand(Connection* conn)
+static void LIndexCommand(Response* rsp, std::vector<std::string> argv)
 {
     std::string val;
-    rocksdb::Status s = redisdb_->LIndex(conn->_argv[1], std::stoi(conn->_argv[2], NULL, 0), &val);
+    rocksdb::Status s = redisdb_->LIndex(argv[1], std::stoi(argv[2], NULL, 0), &val);
 
     if (!s.ok()) {
-        conn->sendReply("$-1\r\n");
+        rsp->SendReply("$-1\r\n");
         LOG_ERROR << s.getState();
         return;
     }
 
-    conn->sendReplyBulk(val);
+    rsp->SendReplyBulk(val);
 }
 
-static void LLenCommmand(Connection* conn)
+static void LLenCommmand(Response* rsp, std::vector<std::string> argv)
 {
     int64_t llen;
-    rocksdb::Status s = redisdb_->LLen(conn->_argv[1], &llen);
-    conn->sendReplyLongLong(llen);
+    rocksdb::Status s = redisdb_->LLen(argv[1], &llen);
+    rsp->SendReplyLongLong(llen);
 }
 
-static void LPopCommand(Connection* conn)
+static void LPopCommand(Response* rsp, std::vector<std::string> argv)
 {
     std::string val;
-    rocksdb::Status s = redisdb_->LPop(conn->_argv[1], val);
+    rocksdb::Status s = redisdb_->LPop(argv[1], val);
 
     if (!s.ok()) {
-        conn->sendReply("$-1\r\n");
+        rsp->SendReply("$-1\r\n");
         LOG_ERROR << s.getState();
         return;
     }
 
-    conn->sendReplyBulk(val);
+    rsp->SendReplyBulk(val);
 }
 
-static void SAddCommand(Connection* conn)
+static void SAddCommand(Response* rsp, std::vector<std::string> argv)
 {
     int64_t ret = 0;
     int64_t size;
 
-    int members = conn->_argv.size() - 2;
+    int members = argv.size() - 2;
     rocksdb::Status s;
 
     while (members--) {
-        s = redisdb_->SAdd(conn->_argv[1], conn->_argv[members + 2], &size);
+        s = redisdb_->SAdd(argv[1], argv[members + 2], &size);
         ret += size;
         if (!s.ok()) {
-            conn->sendReplyError("internal error");
+            rsp->SendReplyError("internal error");
             LOG_ERROR << s.getState();
             return;
         }
     }
 
-    conn->sendReplyLongLong(ret);
+    rsp->SendReplyLongLong(ret);
 }
 
-static void SCardCommand(Connection* conn)
+static void SCardCommand(Response* rsp, std::vector<std::string> argv)
 {
     int64_t ret;
     rocksdb::Status s;
 
-    s = redisdb_->SCard(conn->_argv[1], &ret);
+    s = redisdb_->SCard(argv[1], &ret);
 
-    conn->sendReplyLongLong(ret);
+    rsp->SendReplyLongLong(ret);
 }
 
 void InitRedisCommand(std::shared_ptr<RedisDB> db)
@@ -177,7 +177,8 @@ void InitRedisCommand(std::shared_ptr<RedisDB> db)
 
 RedisCommand* LookupCommand(std::string cmd)
 {
-    if (commands_.find(cmd) == commands_.end()) return NULL;
+    if (commands_.find(cmd) == commands_.end())
+        return NULL;
     return &commands_[cmd];
 }
 }
