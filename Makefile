@@ -14,7 +14,7 @@ benchmarks = \
 
 .PHONY: all
 
-all: blink $(obj) $(test) $(benchmarks)
+all: blink $(obj) $(test)
 
 CC := g++
 
@@ -40,7 +40,7 @@ $(build_dir)/%_benchmark: benchmark/%_benchmark.cc $(obj)
 
 $(build_dir)/%.o: src/%.cc
 	@test -d build || mkdir -p build
-	$(CC) $(CFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
 	@rm -rf build

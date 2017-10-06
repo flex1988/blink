@@ -6,7 +6,7 @@
 
 #include <memory>
 
-rocksdb::Status RedisDB::LPush(const std::string &key, const std::string &val, int64_t *llen)
+rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, int64_t* llen)
 {
     rocksdb::Status s;
 
@@ -35,7 +35,7 @@ rocksdb::Status RedisDB::LPush(const std::string &key, const std::string &val, i
     return s;
 }
 
-rocksdb::Status RedisDB::LPushX(const std::string &key, const std::string &val, int64_t *llen)
+rocksdb::Status RedisDB::LPushX(const std::string& key, const std::string& val, int64_t* llen)
 {
     RecordLock l(&mutex_list_record_, key);
 
@@ -73,7 +73,7 @@ rocksdb::Status RedisDB::LPushX(const std::string &key, const std::string &val, 
     return s;
 }
 
-rocksdb::Status RedisDB::LLen(const std::string &key, int64_t *llen)
+rocksdb::Status RedisDB::LLen(const std::string& key, int64_t* llen)
 {
     std::shared_ptr<ListMeta> meta = GetListMeta(key);
 
@@ -87,7 +87,7 @@ rocksdb::Status RedisDB::LLen(const std::string &key, int64_t *llen)
     return rocksdb::Status::OK();
 }
 
-rocksdb::Status RedisDB::LPop(const std::string &key, std::string &val)
+rocksdb::Status RedisDB::LPop(const std::string& key, std::string& val)
 {
     rocksdb::Status s;
     int64_t addr;
@@ -111,7 +111,7 @@ rocksdb::Status RedisDB::LPop(const std::string &key, std::string &val)
     return s;
 }
 
-rocksdb::Status RedisDB::LIndex(const std::string &key, const int64_t index, std::string *val)
+rocksdb::Status RedisDB::LIndex(const std::string& key, const int64_t index, std::string* val)
 {
     rocksdb::Status s;
     int64_t cursor = index;
@@ -120,7 +120,7 @@ rocksdb::Status RedisDB::LIndex(const std::string &key, const int64_t index, std
 
     std::shared_ptr<ListMeta> meta = GetListMeta(key);
 
-    if (meta == NULL) {
+    if (meta == nullptr) {
         return rocksdb::Status::InvalidArgument("list meta not exists");
     }
 
@@ -129,19 +129,17 @@ rocksdb::Status RedisDB::LIndex(const std::string &key, const int64_t index, std
     if (cursor >= meta->Size())
         return rocksdb::Status::InvalidArgument("outof list index");
 
-    for (int i = 0; i < LIST_META_BLOCKS; i++) {
-        ListMetaBlockPtr *blockptr = meta->BlockAt(i);
-        if (cursor > blockptr->size)
+    for (int i = 0; i < meta->BSize(); i++) {
+        ListMetaBlockPtr* blockptr = meta->BlockAt(i);
+        if (cursor >= blockptr->size) {
             cursor -= blockptr->size;
+        }
         else {
-            std::string blockkey = EncodeListBlockKey(key, blockptr->addr);
-            std::string blockval;
+            std::shared_ptr<ListMetaBlock> block = GetListMetaBlock(key, blockptr->addr);
 
-            if (memmeta_.find(blockkey) == memmeta_.end()) {
+            if (block == nullptr) {
                 return rocksdb::Status::InvalidArgument("list meta block not exists");
             }
-
-            std::shared_ptr<ListMetaBlock> block = std::dynamic_pointer_cast<ListMetaBlock>(memmeta_[blockkey]);
 
             std::string valuekey = EncodeListValueKey(key, block->FetchAddr(cursor));
 
@@ -154,11 +152,15 @@ rocksdb::Status RedisDB::LIndex(const std::string &key, const int64_t index, std
     return rocksdb::Status::Corruption("get list element error");
 }
 
-rocksdb::Status RedisDB::LRange(const std::string &key, int start, int end, std::vector<std::string> &range)
+rocksdb::Status RedisDB::LRange(const std::string& key, int start, int end, std::vector<std::string>& range)
 {
     RecordLock l(&mutex_list_record_, key);
 
     std::shared_ptr<ListMeta> meta = GetListMeta(key);
+
+    if (meta == nullptr) {
+        return rocksdb::Status::InvalidArgument("list meta not exists");
+    }
 
     if (start > meta->Size() - 1) {
         return rocksdb::Status::OK();
@@ -181,6 +183,10 @@ rocksdb::Status RedisDB::LRange(const std::string &key, int start, int end, std:
     }
 
     auto s = list_->MultiGet(rocksdb::ReadOptions(), kslices, &range);
+
+    for (auto i : s) {
+        assert(i.ok());
+    }
 
     return rocksdb::Status::OK();
 }
