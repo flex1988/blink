@@ -190,3 +190,122 @@ rocksdb::Status RedisDB::LRange(const std::string& key, int start, int end, std:
 
     return rocksdb::Status::OK();
 }
+
+rocksdb::Status RedisDB::LSet(const std::string& key, int index, const std::string& val)
+{
+    RecordLock l(&mutex_list_record_, key);
+
+    std::shared_ptr<ListMeta> meta = GetListMeta(key);
+
+    if (meta == nullptr) {
+        return rocksdb::Status::InvalidArgument("no such key");
+    }
+
+    int64_t addr = GetIndexAddr(meta, key, index);
+
+    if (addr == -1) {
+        return rocksdb::Status::Corruption("list meta error");
+    }
+
+    std::string leaf = EncodeListValueKey(key, addr);
+
+    auto s = list_->Put(rocksdb::WriteOptions(), leaf, val);
+
+    return s;
+}
+
+rocksdb::Status RedisDB::LRem(const std::string& key, int count, const std::string& val, int* remove)
+{
+    RecordLock l(&mutex_list_record_, key);
+
+    std::shared_ptr<ListMeta> meta = GetListMeta(key);
+
+    if (meta == nullptr) {
+        return rocksdb::Status::InvalidArgument("no such key");
+    }
+
+    int64_t addr;
+    int index;
+    std::string v;
+
+    rocksdb::Status s;
+
+    if (count > 0) {
+        index = 0;
+        while (count) {
+            addr = GetIndexAddr(meta, key, index++);
+            if (addr == -1)
+                break;
+
+            std::string leaf = EncodeListValueKey(key, addr);
+
+            s = list_->Get(rocksdb::ReadOptions(), leaf, &v);
+
+            assert(s.ok());
+
+            if (v == val) {
+                s = list_->Delete(rocksdb::WriteOptions(), leaf);
+                assert(s.ok());
+
+                RemoveListMetaAt(key, index - 1, &addr);
+                (*remove)++;
+
+                count--;
+            }
+        }
+    }
+    else if (count < 0) {
+        index = meta->Size() - 1;
+        count = -count;
+
+        while (count) {
+            if (index < 0)
+                break;
+
+            addr = GetIndexAddr(meta, key, index--);
+
+            if (addr == -1)
+                break;
+
+            std::string leaf = EncodeListValueKey(key, addr);
+
+            s = list_->Get(rocksdb::ReadOptions(), leaf, &v);
+
+            assert(s.ok());
+
+            if (v == val) {
+                s = list_->Delete(rocksdb::WriteOptions(), leaf);
+                assert(s.ok());
+
+                RemoveListMetaAt(key, index + 1, &addr);
+                (*remove)++;
+
+                count--;
+            }
+        }
+    }
+    else {
+        index = 0;
+        while (1) {
+            addr = GetIndexAddr(meta, key, index++);
+            if (addr == -1)
+                break;
+
+            std::string leaf = EncodeListValueKey(key, addr);
+
+            s = list_->Get(rocksdb::ReadOptions(), leaf, &v);
+
+            assert(s.ok());
+
+            if (v == val) {
+                s = list_->Delete(rocksdb::WriteOptions(), leaf);
+                assert(s.ok());
+
+                RemoveListMetaAt(key, index - 1, &addr);
+                (*remove)++;
+            }
+        }
+    }
+
+    return rocksdb::Status::OK();
+}

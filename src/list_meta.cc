@@ -85,13 +85,20 @@ ListMetaBlockPtr* ListMeta::InsertNewMetaBlockPtr(int index)
 
 bool ListMeta::operator==(const ListMeta& meta)
 {
-    if (key_ != meta.key_) return false;
-    if (size_ != meta.size_) return false;
-    if (limit_ != meta.limit_) return false;
-    if (bsize_ != meta.bsize_) return false;
-    if (blimit_ != meta.blimit_) return false;
-    if (area_index_ != meta.area_index_) return false;
-    if (std::memcmp(blocks_, meta.blocks_, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS) != 0) return false;
+    if (key_ != meta.key_)
+        return false;
+    if (size_ != meta.size_)
+        return false;
+    if (limit_ != meta.limit_)
+        return false;
+    if (bsize_ != meta.bsize_)
+        return false;
+    if (blimit_ != meta.blimit_)
+        return false;
+    if (area_index_ != meta.area_index_)
+        return false;
+    if (std::memcmp(blocks_, meta.blocks_, sizeof(ListMetaBlockPtr) * LIST_META_BLOCKS) != 0)
+        return false;
 
     return true;
 }
@@ -327,7 +334,8 @@ rocksdb::Status RedisDB::RemoveListMetaAt(const std::string& key, int64_t index,
 {
     std::shared_ptr<ListMeta> meta = GetListMeta(key);
 
-    if (meta == nullptr) return rocksdb::Status::OK();
+    if (meta == nullptr)
+        return rocksdb::Status::OK();
 
     if (index > meta->Size() || index < 0) {
         return rocksdb::Status::InvalidArgument("index size beyond max index: " + std::to_string(index));
@@ -366,7 +374,8 @@ void RedisDB::GetMetaRangeKeys(std::shared_ptr<ListMeta> meta, int start, int nu
 {
     int index = 0;
     for (int i = 0; i < meta->BSize(); i++) {
-        if (nums == 0) break;
+        if (nums == 0)
+            break;
 
         ListMetaBlockPtr* blockptr = meta->BlockAt(i);
         index += blockptr->size;
@@ -388,10 +397,31 @@ void RedisDB::GetMetaBlockRangeKeys(std::shared_ptr<ListMetaBlock> block, int st
     assert(start >= 0);
     assert(nums <= block->Size());
 
-    if (start >= block->Size()) return;
+    if (start >= block->Size())
+        return;
 
     while (nums--) {
         std::string key = EncodeListValueKey(block->Key(), block->FetchAddr(static_cast<int64_t>(start++)));
         keys.push_back(key);
     }
+}
+
+int64_t RedisDB::GetIndexAddr(std::shared_ptr<ListMeta> meta, const std::string& key, int index)
+{
+    for (int i = 0; i < meta->BSize(); i++) {
+        ListMetaBlockPtr* blockptr = meta->BlockAt(i);
+        if (index >= blockptr->size) {
+            index -= blockptr->size;
+        }
+        else {
+            std::shared_ptr<ListMetaBlock> block = GetListMetaBlock(key, blockptr->addr);
+
+            if (block == nullptr)
+                return -1;
+
+            return block->FetchAddr(index);
+        }
+    }
+
+    return -1;
 }

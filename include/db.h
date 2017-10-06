@@ -19,7 +19,7 @@
 class SetMeta;
 
 class RedisDB {
-   public:
+  public:
     RedisDB(const std::string& path);
     ~RedisDB();
 
@@ -39,6 +39,8 @@ class RedisDB {
     rocksdb::Status LIndex(const std::string& key, const int64_t index, std::string* val);
     rocksdb::Status LLen(const std::string& key, int64_t* llen);
     rocksdb::Status LRange(const std::string& key, int start, int end, std::vector<std::string>& range);
+    rocksdb::Status LSet(const std::string& key, int index, const std::string& val);
+    rocksdb::Status LRem(const std::string& key, int count, const std::string& val, int* remove);
 
     // SET
     rocksdb::Status SAdd(const std::string& key, const std::string& member, int64_t* res);
@@ -59,7 +61,7 @@ class RedisDB {
     void EnableCompact() { forbid_compact_ = false; };
     Queue<std::string> metaqueue_;
 
-   private:
+  private:
     std::string path_;
     std::unique_ptr<rocksdb::DBWithTTL> kv_;
     std::unique_ptr<rocksdb::DBWithTTL> list_;
@@ -86,6 +88,8 @@ class RedisDB {
 
     void GetMetaRangeKeys(std::shared_ptr<ListMeta> meta, int start, int nums, std::vector<std::string>& keys);
     void GetMetaBlockRangeKeys(std::shared_ptr<ListMetaBlock> block, int start, int nums, std::vector<std::string>& keys);
+
+    int64_t GetIndexAddr(std::shared_ptr<ListMeta> meta, const std::string& key, int index);
 
     int aof_fd_;
 

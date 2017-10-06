@@ -123,6 +123,33 @@ static void LPopCommand(Response* rsp, std::vector<std::string> argv)
     rsp->SendReplyBulk(val);
 }
 
+static void LSetCommand(Response* rsp, std::vector<std::string> argv)
+{
+    rocksdb::Status s = redisdb_->LSet(argv[1], std::atoi(argv[2].c_str()), argv[3]);
+
+    if (!s.ok()) {
+        rsp->SendReply("$-1\r\n");
+        LOG_ERROR << s.getState();
+        return;
+    }
+
+    rsp->SendReply("+OK\r\n");
+}
+
+static void LRemCommand(Response* rsp, std::vector<std::string> argv)
+{
+    int removed;
+    rocksdb::Status s = redisdb_->LRem(argv[1], std::atoi(argv[2].c_str()), argv[3], &removed);
+
+    if (!s.ok()) {
+        rsp->SendReply("$-1\r\n");
+        LOG_ERROR << s.getState();
+        return;
+    }
+
+    rsp->SendReplyLongLong(removed);
+}
+
 static void SAddCommand(Response* rsp, std::vector<std::string> argv)
 {
     int64_t ret = 0;
@@ -169,7 +196,9 @@ void InitRedisCommand(std::shared_ptr<RedisDB> db)
     commands_["lindex"] = {"lindex", LIndexCommand, 0, 3};
     commands_["llen"] = {"llen", LLenCommmand, 0, 2};
     commands_["lpop"] = {"lpop", LPopCommand, PROPAGATE_AOF, 2};
+    commands_["lset"] = {"lset", LSetCommand, PROPAGATE_AOF, 4};
     commands_["lrange"] = {"lrange", LRangeCommand, 0, 4};
+    commands_["lrem"] = {"lrem", LRemCommand, PROPAGATE_AOF, 4};
 
     commands_["sadd"] = {"sadd", SAddCommand, PROPAGATE_AOF, 3};
     commands_["scard"] = {"scard", SCardCommand, 0, 2};
