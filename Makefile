@@ -5,15 +5,20 @@ obj := $(build_dir)/server.o $(build_dir)/connection.o $(build_dir)/port.o $(bui
 
 tests = \
 	$(build_dir)/db_test \
-	$(build_dir)/meta_test
+	$(build_dir)/meta_test	\
+	$(build_dir)/list_test
+	
+
+benchmarks = \
+	$(build_dir)/list_benchmark
 
 .PHONY: all
 
-all: blink $(obj) $(test)
+all: blink $(obj) $(test) $(benchmarks)
 
 CC := g++
 
-CFLAGS := -g -lmuduo_net_cpp11 -lmuduo_base_cpp11 -lrocksdb -lz -lbz2 -lgtest -pthread -Iinclude -std=c++11 -Wall
+CFLAGS := -g -lmuduo_net_cpp11 -lmuduo_base_cpp11 -lrocksdb -lz -lbz2 -lgtest -lpthread -Iinclude -std=c++11 -Wall
 
 blink: $(obj)
 	$(CC) -o build/blink src/blink.cc $(wildcard build/*.o) $(CFLAGS)
@@ -23,15 +28,19 @@ check: $(tests)
 	@mkdir /tmp/db
 	@for t in $(notdir $(tests)); do echo "***** Running $$t"; $(build_dir)/$$t || exit 1; done
 
-$(build_dir)/db_test: $(obj)
-	$(CC) test/db_test.cc $(obj) $(CFLAGS) -o $(build_dir)/db_test
+benchmark: $(benchmarks)
 
-$(build_dir)/meta_test: $(obj)
-	$(CC) test/meta_test.cc $(obj) $(CFLAGS) -o $(build_dir)/meta_test
+$(build_dir)/%_test: test/%_test.cc $(obj)
+	@test -d build || mkdir -p build
+	$(CC) $< $(obj) $(CFLAGS) -o $@
+
+$(build_dir)/%_benchmark: benchmark/%_benchmark.cc $(obj)
+	@test -d build || mkdir -p build
+	$(CC) $< $(obj) $(CFLAGS) -lbenchmark -lcpp_redis -ltacopie -o $@ 
 
 $(build_dir)/%.o: src/%.cc
 	@test -d build || mkdir -p build
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -o $@ $<
 
 clean:
 	@rm -rf build

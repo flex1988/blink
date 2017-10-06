@@ -18,7 +18,7 @@ TEST_F(MetaTest, LISTMETA)
     }
 
     std::string str = meta->Serialize();
-    ListMeta *meta1 = new ListMeta(str, REINIT);
+    ListMeta *meta1 = new ListMeta(str.substr(3), REINIT);
 
     ASSERT_TRUE(*meta == *meta1);
 }

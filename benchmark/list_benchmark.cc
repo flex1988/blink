@@ -1,18 +1,24 @@
 #include <benchmark/benchmark.h>
+#include <cpp_redis/cpp_redis>
+#include <iostream>
 
-static void BM_StringCreation(benchmark::State& state) {
-  while (state.KeepRunning())
-    std::string empty_string;
+static void BM_GetSet(benchmark::State& state)
+{
+    while (state.KeepRunning()) {
+        cpp_redis::client client;
+
+        client.connect("127.0.0.1", 6379, [](const std::string& host, std::size_t port, cpp_redis::client::connect_state status) {
+            if (status == cpp_redis::client::connect_state::dropped) {
+                std::cout << "client disconnected from " << host << ":" << port << std::endl;
+            }
+        });
+
+        client.set("hello", "42", [](cpp_redis::reply& reply) { std::cout << "set hello 42: " << reply << std::endl; });
+
+        client.get("hello", [](cpp_redis::reply& reply) { std::cout << "get hello: " << reply << std::endl; });
+    }
 }
-// Register the function as a benchmark
-BENCHMARK(BM_StringCreation);
 
-// Define another benchmark
-static void BM_StringCopy(benchmark::State& state) {
-  std::string x = "hello";
-  while (state.KeepRunning())
-    std::string copy(x);
-}
-BENCHMARK(BM_StringCopy);
+BENCHMARK(BM_GetSet);
 
-BENCHMARK_MAIN();
+BENCHMARK_MAIN()

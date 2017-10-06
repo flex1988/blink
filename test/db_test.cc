@@ -24,34 +24,6 @@ TEST_F(RedisDBTest, KV)
     EXPECT_EQ(val, "5678");
 }
 
-TEST_F(RedisDBTest, LIST)
-{
-    rocksdb::Status s;
-    int64_t llen;
-    int64_t rlen;
-    std::string val;
-
-    for (int i = 0; i < 200000; i++) {
-        s = db_->LPush("mylist", std::to_string(i), &llen);
-        EXPECT_EQ(true, s.ok());
-        EXPECT_EQ(llen, i + 1);
-
-        s = db_->LLen("mylist", &rlen);
-        EXPECT_EQ(true, s.ok());
-        EXPECT_EQ(llen, rlen);
-
-        s = db_->LIndex("mylist", 0, &val);
-        ASSERT_TRUE(s.ok());
-        EXPECT_EQ(std::to_string(i), val);
-    }
-
-    for (int i = 199999; i >= 0; i--) {
-        s = db_->LPop("mylist", val);
-        ASSERT_TRUE(s.ok());
-        EXPECT_EQ(std::to_string(i), val);
-    }
-}
-
 // TEST_F(RedisDBTest, APPENDONLY)
 //{
 // int64_t llen;
