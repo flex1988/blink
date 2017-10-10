@@ -1,5 +1,7 @@
 #include "meta.h"
 
+MetaBase::~MetaBase() {}
+
 std::string MetaBase::ActionBuffer()
 {
     std::string buf;
@@ -22,14 +24,14 @@ void MetaBase::ResetBuffer()
 
 void MetaBase::InitActionHeader()
 {
-    //action_buffer_.append(1, ACTION_BUFFER_MAGIC);
-    //action_buffer_.append(1, Type());
-    //action_buffer_.append(1, 0);
+    // action_buffer_.append(1, ACTION_BUFFER_MAGIC);
+    // action_buffer_.append(1, Type());
+    // action_buffer_.append(1, 0);
 }
 
 void MetaBase::SaveAction(Action action, int16_t op, const std::string& str)
 {
-    ;  // action_buffer_.append((char*)&action, 2);
+    ; // action_buffer_.append((char*)&action, 2);
     // action_buffer_.append((char*)&op, 2);
 
     // if (str.empty()) return;

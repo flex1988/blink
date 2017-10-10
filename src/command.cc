@@ -138,7 +138,7 @@ static void LSetCommand(Response* rsp, std::vector<std::string> argv)
 
 static void LRemCommand(Response* rsp, std::vector<std::string> argv)
 {
-    int removed;
+    int64_t removed = 0;
     rocksdb::Status s = redisdb_->LRem(argv[1], std::atoi(argv[2].c_str()), argv[3], &removed);
 
     if (!s.ok()) {

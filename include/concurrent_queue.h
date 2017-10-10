@@ -1,4 +1,3 @@
-
 #ifndef __CONCURRENT_QUEUE_H__
 #define __CONCURRENT_QUEUE_H__
 

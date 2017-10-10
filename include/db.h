@@ -40,7 +40,7 @@ class RedisDB {
     rocksdb::Status LLen(const std::string& key, int64_t* llen);
     rocksdb::Status LRange(const std::string& key, int start, int end, std::vector<std::string>& range);
     rocksdb::Status LSet(const std::string& key, int index, const std::string& val);
-    rocksdb::Status LRem(const std::string& key, int count, const std::string& val, int* remove);
+    rocksdb::Status LRem(const std::string& key, int count, const std::string& val, int64_t* remove);
 
     // SET
     rocksdb::Status SAdd(const std::string& key, const std::string& member, int64_t* res);

@@ -58,6 +58,8 @@ int ListMeta::AllocArea()
     return area_index_++;
 }
 
+std::shared_ptr<ListIterator> ListMeta::Iterator(int order) { return std::shared_ptr<ListIterator>(new ListIterator(this, order)); }
+
 ListMetaBlockPtr* ListMeta::InsertNewMetaBlockPtr(int index)
 {
     if (IsBlocksFull()) {
@@ -358,6 +360,8 @@ rocksdb::Status RedisDB::RemoveListMetaAt(const std::string& key, int64_t index,
 
     if (blockptr->size == 0) {
         meta->RemoveBlockAt(bidx);
+        std::string blockkey = EncodeListBlockKey(key, blockptr->addr);
+        memmeta_.erase(blockkey);
     }
 
     meta->DecrSize();
@@ -415,6 +419,12 @@ int64_t RedisDB::GetIndexAddr(std::shared_ptr<ListMeta> meta, const std::string&
         }
         else {
             std::shared_ptr<ListMetaBlock> block = GetListMetaBlock(key, blockptr->addr);
+
+            if (block->Size() == 0) {
+                std::string blockkey = EncodeListBlockKey(key, blockptr->addr);
+                memmeta_.erase(blockkey);
+                return -1;
+            }
 
             if (block == nullptr)
                 return -1;

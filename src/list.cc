@@ -214,7 +214,7 @@ rocksdb::Status RedisDB::LSet(const std::string& key, int index, const std::stri
     return s;
 }
 
-rocksdb::Status RedisDB::LRem(const std::string& key, int count, const std::string& val, int* remove)
+rocksdb::Status RedisDB::LRem(const std::string& key, int count, const std::string& val, int64_t* remove)
 {
     RecordLock l(&mutex_list_record_, key);
 
@@ -227,7 +227,6 @@ rocksdb::Status RedisDB::LRem(const std::string& key, int count, const std::stri
     int64_t addr;
     int index;
     std::string v;
-
     rocksdb::Status s;
 
     if (count > 0) {
@@ -250,6 +249,7 @@ rocksdb::Status RedisDB::LRem(const std::string& key, int count, const std::stri
                 RemoveListMetaAt(key, index - 1, &addr);
                 (*remove)++;
 
+                index--;
                 count--;
             }
         }
@@ -280,6 +280,7 @@ rocksdb::Status RedisDB::LRem(const std::string& key, int count, const std::stri
                 RemoveListMetaAt(key, index + 1, &addr);
                 (*remove)++;
 
+                index++;
                 count--;
             }
         }
@@ -302,6 +303,7 @@ rocksdb::Status RedisDB::LRem(const std::string& key, int count, const std::stri
                 assert(s.ok());
 
                 RemoveListMetaAt(key, index - 1, &addr);
+                index--;
                 (*remove)++;
             }
         }
