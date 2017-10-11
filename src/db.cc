@@ -13,12 +13,15 @@
 #include "rocksdb/options.h"
 #include "rocksdb/slice.h"
 
+namespace blink {
+
 static ssize_t ReadSync(int fd, char* buffer, ssize_t nread)
 {
     ssize_t n;
     ssize_t last = nread;
     for (;;) {
-        if (last == 0) return nread;
+        if (last == 0)
+            return nread;
         n = read(fd, buffer, last);
         if (n < 0) {
             return n;
@@ -40,7 +43,8 @@ static ssize_t ReadUntilChar(int fd, char* buffer, char target)
     for (;;) {
         n = read(fd, buffer, 1);
 
-        if (n == -1 || n == 0) return n;
+        if (n == -1 || n == 0)
+            return n;
 
         nread++;
 
@@ -60,11 +64,13 @@ static ssize_t ReadLineSync(int fd, char* buffer, ssize_t size)
         char c;
 
         ret = ReadSync(fd, &c, 1);
-        if (ret == -1 || ret == 0) return ret;
+        if (ret == -1 || ret == 0)
+            return ret;
 
         if (c == '\n') {
             *buffer = '\0';
-            if (nread && *(buffer - 1) == '\r') *(buffer - 1) = '\0';
+            if (nread && *(buffer - 1) == '\r')
+                *(buffer - 1) = '\0';
             return nread;
         }
         else {
@@ -95,22 +101,27 @@ RedisDB::RedisDB(const std::string& path) : metaqueue_(), path_(path), meta_log_
     options_.max_write_buffer_number = 5;
     options_.min_write_buffer_number_to_merge = 2;
 
+    lop_ = std::shared_ptr<ListMetaOperator>(new ListMetaOperator(&memmeta_));
+
     rocksdb::DBWithTTL* db;
 
     rocksdb::Status s = rocksdb::DBWithTTL::Open(options_, path_ + "/kv", &db);
-    if (!s.ok()) LOG_INFO << s.getState();
+    if (!s.ok())
+        LOG_INFO << s.getState();
     assert(s.ok());
 
     kv_ = std::unique_ptr<rocksdb::DBWithTTL>(db);
 
     s = rocksdb::DBWithTTL::Open(options_, path_ + "/list", &db);
-    if (!s.ok()) LOG_INFO << s.getState();
+    if (!s.ok())
+        LOG_INFO << s.getState();
     assert(s.ok());
 
     list_ = std::unique_ptr<rocksdb::DBWithTTL>(db);
 
     s = rocksdb::DBWithTTL::Open(options_, path_ + "/set", &db);
-    if (!s.ok()) LOG_INFO << s.getState();
+    if (!s.ok())
+        LOG_INFO << s.getState();
     assert(s.ok());
 
     set_ = std::unique_ptr<rocksdb::DBWithTTL>(db);
@@ -128,7 +139,7 @@ RedisDB::RedisDB(const std::string& path) : metaqueue_(), path_(path), meta_log_
 }
 
 RedisDB::~RedisDB()
-{  // Close();
+{ // Close();
 }
 
 void RedisDB::AppendMeta()
@@ -175,40 +186,44 @@ void RedisDB::LoadMetaSnapshot()
 
     for (;;) {
         ret = ReadUntilChar(fd, buffer, META_SNAP_MAGIC);
-        if (ret == 0 || ret == -1) goto end;
+        if (ret == 0 || ret == -1)
+            goto end;
 
         ret = ReadSync(fd, buffer, 2);
-        if (ret == 0 || ret == -1 || ret < 2) goto end;
+        if (ret == 0 || ret == -1 || ret < 2)
+            goto end;
 
         len = *(uint16_t*)(buffer);
 
         ret = ReadSync(fd, buffer, len);
-        if (ret == 0 || ret == -1 || ret < len) goto end;
+        if (ret == 0 || ret == -1 || ret < len)
+            goto end;
 
-        if (buffer[len - 2] != '\r' || buffer[len - 1] != '\n') goto end;
+        if (buffer[len - 2] != '\r' || buffer[len - 1] != '\n')
+            goto end;
 
         switch (buffer[0]) {
-            case 'L': {
-                uint8_t klen = buffer[1];
-                std::string key = std::string(buffer + 2, klen);
-                LOG_DEBUG << "load list meta: " << key;
-                std::string metakey = EncodeListMetaKey(key);
-                memmeta_[metakey] = std::shared_ptr<MetaBase>(new ListMeta(std::string(buffer, len - 2), REINIT));
-                break;
-            }
-            case 'B': {
-                uint8_t klen = buffer[1];
-                std::string key = std::string(buffer + 2, klen);
-                int64_t addr = *(int64_t*)(buffer + 2 + klen);
-                LOG_DEBUG << "load list meta block: " << key;
-                std::string blockkey = EncodeListBlockKey(key, addr);
-                memmeta_[blockkey] = std::shared_ptr<MetaBase>(new ListMetaBlock(std::string(buffer, len - 2)));
-                break;
-            }
-            default:
-                LOG_INFO << "meta snapshot corruption is not allowed";
-                assert(0);
-                break;
+        case 'L': {
+            uint8_t klen = buffer[1];
+            std::string key = std::string(buffer + 2, klen);
+            LOG_DEBUG << "load list meta: " << key;
+            std::string metakey = EncodeListMetaKey(key);
+            memmeta_[metakey] = std::shared_ptr<MetaBase>(new ListMeta(std::string(buffer, len - 2), REINIT));
+            break;
+        }
+        case 'B': {
+            uint8_t klen = buffer[1];
+            std::string key = std::string(buffer + 2, klen);
+            int64_t addr = *(int64_t*)(buffer + 2 + klen);
+            LOG_DEBUG << "load list meta block: " << key;
+            std::string blockkey = EncodeListBlockKey(key, addr);
+            memmeta_[blockkey] = std::shared_ptr<MetaBase>(new ListMetaBlock(std::string(buffer, len - 2)));
+            break;
+        }
+        default:
+            LOG_INFO << "meta snapshot corruption is not allowed";
+            assert(0);
+            break;
         }
     }
 
@@ -248,7 +263,8 @@ void RedisDB::LoadMetaAppendonly()
 
     while (1) {
         len = ReadLineSync(fd, buf, buflen);
-        if (len == -1 || len == 0 || buf[0] != '*') goto error;
+        if (len == -1 || len == 0 || buf[0] != '*')
+            goto error;
 
         bulks = std::atoi(buf + 1);
 
@@ -256,7 +272,8 @@ void RedisDB::LoadMetaAppendonly()
 
         while (bulks-- > 0) {
             len = ReadLineSync(fd, buf, buflen);
-            if (len == -1 || len == 0 || buf[0] != '$') goto error;
+            if (len == -1 || len == 0 || buf[0] != '$')
+                goto error;
 
             bulk_length = std::atoi(buf + 1);
 
@@ -266,7 +283,8 @@ void RedisDB::LoadMetaAppendonly()
             }
 
             len = ReadSync(fd, buf, bulk_length + 2);
-            if (len == -1 || len == 0 || len < bulk_length + 2) goto error;
+            if (len == -1 || len == 0 || len < bulk_length + 2)
+                goto error;
 
             argv.push_back(std::string(buf, bulk_length));
         }
@@ -293,7 +311,8 @@ error:
 
 void RedisDB::CompactMeta()
 {
-    if(forbid_compact_) return;
+    if (forbid_compact_)
+        return;
 
     LOG_INFO << "Dump meta to disk!";
 
@@ -338,46 +357,46 @@ void RedisDB::ReloadListActionBuffer(char* buf, size_t blen)
         index += 4;
 
         switch (action) {
-            case INIT: {
-                if (op < 0 || op > (blen - index)) {
-                    LOG_INFO << "meta log corruption";
-                    return;
-                }
-                std::string key = std::string(buf + index, op);
-                std::string metakey = EncodeListMetaKey(key);
-                meta = std::shared_ptr<ListMeta>(new ListMeta(key, INIT));
-                memmeta_[metakey] = std::dynamic_pointer_cast<MetaBase>(meta);
-                index += op;
-                break;
-            }
-            case REINIT: {
-                if (op < 0 || op > (blen - index)) {
-                    LOG_INFO << "meta log corruption";
-                    return;
-                }
-                std::string key = std::string(buf + index, op);
-                std::string metakey = EncodeListMetaKey(key);
-                assert(memmeta_.find(metakey) != memmeta_.end());
-                meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
-                index += op;
-                break;
-            }
-            case SIZE:
-                // meta->SetSize(op);
-                break;
-            case ALLOC:
-                // meta->SetArea(op);
-                break;
-            case BSIZE:
-                // meta->SetBSize(op);
-                break;
-            case INSERT:
-                meta->InsertNewMetaBlockPtr(op);
-                break;
-
-            default:
-                LOG_INFO << "unknown action: " << action;
+        case INIT: {
+            if (op < 0 || op > (blen - index)) {
+                LOG_INFO << "meta log corruption";
                 return;
+            }
+            std::string key = std::string(buf + index, op);
+            std::string metakey = EncodeListMetaKey(key);
+            meta = std::shared_ptr<ListMeta>(new ListMeta(key, INIT));
+            memmeta_[metakey] = std::dynamic_pointer_cast<MetaBase>(meta);
+            index += op;
+            break;
+        }
+        case REINIT: {
+            if (op < 0 || op > (blen - index)) {
+                LOG_INFO << "meta log corruption";
+                return;
+            }
+            std::string key = std::string(buf + index, op);
+            std::string metakey = EncodeListMetaKey(key);
+            assert(memmeta_.find(metakey) != memmeta_.end());
+            meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
+            index += op;
+            break;
+        }
+        case SIZE:
+            // meta->SetSize(op);
+            break;
+        case ALLOC:
+            // meta->SetArea(op);
+            break;
+        case BSIZE:
+            // meta->SetBSize(op);
+            break;
+        case INSERT:
+            meta->InsertNewMetaBlockPtr(op);
+            break;
+
+        default:
+            LOG_INFO << "unknown action: " << action;
+            return;
         }
     }
 }
@@ -397,4 +416,5 @@ void RedisDB::ReloadAppendOnlyCommand(const std::vector<std::string>& argv)
     else {
         LOG_INFO << "reload appendonly corruption!";
     }
+}
 }

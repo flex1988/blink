@@ -4,6 +4,8 @@
 #include "common.h"
 #include "list.h"
 
+namespace blink {
+
 enum MetaType { LIST, LISTBLOCK, SET };
 
 enum Action { DEFAULT, INIT, REINIT, UNIQUE, SIZE, BSIZE, INSERT, ALLOC };
@@ -143,4 +145,16 @@ class SetMeta : public MetaBase {
     std::string key_;
     std::vector<char> bf_;
 };
+
+class ListMetaOperator {
+  public:
+    ListMetaOperator(std::unordered_map<std::string, std::shared_ptr<MetaBase>>* memmeta);
+
+    std::shared_ptr<ListMeta> GetListMeta(const std::string& key, bool create);
+    std::shared_ptr<ListMetaBlock> GetListMetaBlock(const std::string& key, int64_t addr, bool create);
+
+  private:
+    std::unordered_map<std::string, std::shared_ptr<MetaBase>>* memmeta_;
+};
+}
 #endif

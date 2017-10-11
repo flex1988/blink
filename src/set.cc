@@ -2,6 +2,7 @@
 #include "meta.h"
 #include "db.h"
 
+namespace blink {
 rocksdb::Status RedisDB::SAdd(const std::string& key, const std::string& member, int64_t* res)
 {
     rocksdb::Status s;
@@ -71,4 +72,6 @@ rocksdb::Status RedisDB::SCard(const std::string& key, int64_t* res)
     }
 
     return rocksdb::Status::OK();
+}
+
 }

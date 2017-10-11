@@ -4,6 +4,8 @@
 #include "rocksdb/options.h"
 #include "gtest/gtest.h"
 
+using namespace blink;
+
 class RedisDBTest : public testing::Test {
   protected:
     virtual void SetUp() { db_ = std::shared_ptr<RedisDB>(new RedisDB("/tmp/db")); }

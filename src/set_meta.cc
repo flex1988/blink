@@ -2,6 +2,7 @@
 #include "hash.h"
 #include "meta.h"
 
+namespace blink {
 SetMeta::SetMeta(const std::string& key) : size_(0), limit_(SET_MAX_ELEMENT), key_(key), bf_(256, 0) {}
 std::string SetMeta::Serialize()
 {
@@ -31,10 +32,13 @@ bool SetMeta::BFNotExists(const std::string& member)
 {
     uint32_t v = MurmurHash64A(member.data(), member.size());
     uint32_t index = v % (256 * 8);
-    if (bf_.at(index / 8) & v % 8) return false;
+    if (bf_.at(index / 8) & v % 8)
+        return false;
 
     v = crc16(member.data(), member.size());
     index = v % (256 * 8);
-    if (bf_.at(index / 8) & v % 8) return false;
+    if (bf_.at(index / 8) & v % 8)
+        return false;
     return true;
+}
 }

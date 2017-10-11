@@ -1,6 +1,8 @@
 #include "meta.h"
 #include "gtest/gtest.h"
 
+using namespace blink;
+
 class MetaTest : public testing::Test {
     virtual void SetUp(){};
 };

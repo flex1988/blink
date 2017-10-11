@@ -1,5 +1,6 @@
 #include "meta.h"
 
+namespace blink {
 MetaBase::~MetaBase() {}
 
 std::string MetaBase::ActionBuffer()
@@ -37,4 +38,5 @@ void MetaBase::SaveAction(Action action, int16_t op, const std::string& str)
     // if (str.empty()) return;
 
     // action_buffer_.append(str);
+}
 }

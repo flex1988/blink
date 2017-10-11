@@ -1,6 +1,9 @@
 #include "common.h"
 #include "db.h"
 #include "meta.h"
+#include "server.h"
+
+namespace blink {
 
 ListMeta::ListMeta(const std::string& str, Action action)
 {
@@ -59,6 +62,42 @@ int ListMeta::AllocArea()
 }
 
 std::shared_ptr<ListIterator> ListMeta::Iterator(int order) { return std::shared_ptr<ListIterator>(new ListIterator(this, order)); }
+
+ListMetaOperator::ListMetaOperator(std::unordered_map<std::string, std::shared_ptr<MetaBase>>* memmeta) { memmeta_ = memmeta; }
+
+std::shared_ptr<ListMeta> ListMetaOperator::GetListMeta(const std::string& key, bool create)
+{
+    std::string metakey = EncodeListMetaKey(key);
+    std::string metaval;
+
+    if (memmeta_->find(metakey) == memmeta_->end()) {
+        if (!create)
+            return nullptr;
+
+        (*memmeta_)[metakey] = std::shared_ptr<MetaBase>(new ListMeta(key, INIT));
+    }
+
+    std::shared_ptr<ListMeta> meta = std::dynamic_pointer_cast<ListMeta>((*memmeta_)[metakey]);
+
+    return meta;
+}
+
+std::shared_ptr<ListMetaBlock> ListMetaOperator::GetListMetaBlock(const std::string& key, int64_t addr, bool create)
+{
+    std::string blockkey = EncodeListBlockKey(key, addr);
+    std::string blockval;
+
+    if (memmeta_->find(blockkey) == memmeta_->end()) {
+        if (!create)
+            return nullptr;
+
+        (*memmeta_)[blockkey] = std::shared_ptr<MetaBase>(new ListMetaBlock(key, addr));
+    }
+
+    std::shared_ptr<ListMetaBlock> block = std::dynamic_pointer_cast<ListMetaBlock>((*memmeta_)[blockkey]);
+
+    return block;
+}
 
 ListMetaBlockPtr* ListMeta::InsertNewMetaBlockPtr(int index)
 {
@@ -243,65 +282,9 @@ ListMetaBlockPtr* ListMeta::IfNeedCreateBlock(int64_t index, int* bidx)
     return blockptr;
 }
 
-std::shared_ptr<ListMeta> RedisDB::GetOrCreateListMeta(const std::string& key)
-{
-    std::string metakey = EncodeListMetaKey(key);
-    std::string metaval;
-
-    if (memmeta_.find(metakey) == memmeta_.end()) {
-        memmeta_[metakey] = std::shared_ptr<MetaBase>(new ListMeta(key, INIT));
-    }
-
-    std::shared_ptr<ListMeta> meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
-
-    return meta;
-}
-
-std::shared_ptr<ListMeta> RedisDB::GetListMeta(const std::string& key)
-{
-    std::string metakey = EncodeListMetaKey(key);
-    std::string metaval;
-
-    if (memmeta_.find(metakey) == memmeta_.end()) {
-        return nullptr;
-    }
-
-    std::shared_ptr<ListMeta> meta = std::dynamic_pointer_cast<ListMeta>(memmeta_[metakey]);
-
-    return meta;
-}
-
-std::shared_ptr<ListMetaBlock> RedisDB::GetOrCreateListMetaBlock(const std::string& key, int64_t addr)
-{
-    std::string blockkey = EncodeListBlockKey(key, addr);
-    std::string blockval;
-
-    if (memmeta_.find(blockkey) == memmeta_.end()) {
-        memmeta_[blockkey] = std::shared_ptr<MetaBase>(new ListMetaBlock(key, addr));
-    }
-
-    std::shared_ptr<ListMetaBlock> block = std::dynamic_pointer_cast<ListMetaBlock>(memmeta_[blockkey]);
-
-    return block;
-}
-
-std::shared_ptr<ListMetaBlock> RedisDB::GetListMetaBlock(const std::string& key, int64_t addr)
-{
-    std::string blockkey = EncodeListBlockKey(key, addr);
-    std::string blockval;
-
-    if (memmeta_.find(blockkey) == memmeta_.end()) {
-        return nullptr;
-    }
-
-    std::shared_ptr<ListMetaBlock> block = std::dynamic_pointer_cast<ListMetaBlock>(memmeta_[blockkey]);
-
-    return block;
-}
-
 rocksdb::Status RedisDB::InsertListMetaAt(const std::string& key, int64_t index, int64_t* addr, int64_t* size)
 {
-    std::shared_ptr<ListMeta> meta = GetOrCreateListMeta(key);
+    std::shared_ptr<ListMeta> meta = lop_->GetListMeta(key, true);
 
     if (meta->IsElementsFull()) {
         return rocksdb::Status::InvalidArgument("Maximum element size limited: " + std::to_string(meta->Size()));
@@ -318,7 +301,7 @@ rocksdb::Status RedisDB::InsertListMetaAt(const std::string& key, int64_t index,
         return rocksdb::Status::InvalidArgument("Maximum block size limited: " + std::to_string(meta->BSize()));
     }
 
-    std::shared_ptr<ListMetaBlock> block = GetOrCreateListMetaBlock(key, blockptr->addr);
+    std::shared_ptr<ListMetaBlock> block = lop_->GetListMetaBlock(key, blockptr->addr, true);
 
     block->Insert(bidx, meta->AllocArea());
 
@@ -334,7 +317,7 @@ rocksdb::Status RedisDB::InsertListMetaAt(const std::string& key, int64_t index,
 
 rocksdb::Status RedisDB::RemoveListMetaAt(const std::string& key, int64_t index, int64_t* addr)
 {
-    std::shared_ptr<ListMeta> meta = GetListMeta(key);
+    std::shared_ptr<ListMeta> meta = lop_->GetListMeta(key, false);
 
     if (meta == nullptr)
         return rocksdb::Status::OK();
@@ -351,7 +334,7 @@ rocksdb::Status RedisDB::RemoveListMetaAt(const std::string& key, int64_t index,
         return rocksdb::Status::InvalidArgument("invalid index: " + std::to_string(index));
     }
 
-    std::shared_ptr<ListMetaBlock> block = GetListMetaBlock(key, blockptr->addr);
+    std::shared_ptr<ListMetaBlock> block = lop_->GetListMetaBlock(key, blockptr->addr, false);
     assert(block != nullptr);
 
     *addr = block->Remove(idx);
@@ -387,7 +370,7 @@ void RedisDB::GetMetaRangeKeys(std::shared_ptr<ListMeta> meta, int start, int nu
             int begin = start > (index - blockptr->size) ? start : 0;
             int len = nums > blockptr->size ? blockptr->size : nums;
 
-            std::shared_ptr<ListMetaBlock> block = GetListMetaBlock(meta->Key(), blockptr->addr);
+            std::shared_ptr<ListMetaBlock> block = lop_->GetListMetaBlock(meta->Key(), blockptr->addr, false);
 
             GetMetaBlockRangeKeys(block, begin, len, keys);
 
@@ -418,7 +401,7 @@ int64_t RedisDB::GetIndexAddr(std::shared_ptr<ListMeta> meta, const std::string&
             index -= blockptr->size;
         }
         else {
-            std::shared_ptr<ListMetaBlock> block = GetListMetaBlock(key, blockptr->addr);
+            std::shared_ptr<ListMetaBlock> block = lop_->GetListMetaBlock(key, blockptr->addr, false);
 
             if (block->Size() == 0) {
                 std::string blockkey = EncodeListBlockKey(key, blockptr->addr);
@@ -434,4 +417,5 @@ int64_t RedisDB::GetIndexAddr(std::shared_ptr<ListMeta> meta, const std::string&
     }
 
     return -1;
+}
 }

@@ -16,6 +16,7 @@
 #include "rocksdb/slice.h"
 #include "rocksdb/utilities/db_ttl.h"
 
+namespace blink {
 class SetMeta;
 
 class RedisDB {
@@ -61,11 +62,15 @@ class RedisDB {
     void EnableCompact() { forbid_compact_ = false; };
     Queue<std::string> metaqueue_;
 
+    std::unordered_map<std::string, std::shared_ptr<MetaBase>> GetMemMeta() { return memmeta_; };
+
   private:
     std::string path_;
     std::unique_ptr<rocksdb::DBWithTTL> kv_;
     std::unique_ptr<rocksdb::DBWithTTL> list_;
     std::unique_ptr<rocksdb::DBWithTTL> set_;
+
+    std::shared_ptr<ListMetaOperator> lop_;
 
     rocksdb::Options options_;
 
@@ -80,11 +85,6 @@ class RedisDB {
 
     rocksdb::Status InsertListMetaAt(const std::string& key, int64_t index, int64_t* addr, int64_t* size);
     rocksdb::Status RemoveListMetaAt(const std::string& key, int64_t index, int64_t* addr);
-
-    std::shared_ptr<ListMeta> GetOrCreateListMeta(const std::string& key);
-    std::shared_ptr<ListMetaBlock> GetOrCreateListMetaBlock(const std::string& key, int64_t addr);
-    std::shared_ptr<ListMeta> GetListMeta(const std::string& key);
-    std::shared_ptr<ListMetaBlock> GetListMetaBlock(const std::string& key, int64_t addr);
 
     void GetMetaRangeKeys(std::shared_ptr<ListMeta> meta, int start, int nums, std::vector<std::string>& keys);
     void GetMetaBlockRangeKeys(std::shared_ptr<ListMetaBlock> block, int start, int nums, std::vector<std::string>& keys);
@@ -103,4 +103,5 @@ class RedisDB {
     bool reload_aof_;
     bool forbid_compact_;
 };
+}
 #endif

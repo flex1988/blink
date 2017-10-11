@@ -20,7 +20,7 @@ int main(int argc, char** argv)
 
     server_->start();
 
-    loop.runEvery(10, boost::bind(&RedisDB::CompactMeta, server_->db));
+    loop.runEvery(10, boost::bind(&blink::RedisDB::CompactMeta, server_->db));
 
     blink::InitRedisCommand(server_->db);
 
