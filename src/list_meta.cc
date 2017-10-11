@@ -65,7 +65,7 @@ std::shared_ptr<ListIterator> ListMeta::Iterator(int order) { return std::shared
 
 ListMetaOperator::ListMetaOperator(std::unordered_map<std::string, std::shared_ptr<MetaBase>>* memmeta) { memmeta_ = memmeta; }
 
-std::shared_ptr<ListMeta> ListMetaOperator::GetListMeta(const std::string& key, bool create)
+std::shared_ptr<ListMeta> ListMetaOperator::GetMeta(const std::string& key, bool create)
 {
     std::string metakey = EncodeListMetaKey(key);
     std::string metaval;
@@ -82,7 +82,7 @@ std::shared_ptr<ListMeta> ListMetaOperator::GetListMeta(const std::string& key, 
     return meta;
 }
 
-std::shared_ptr<ListMetaBlock> ListMetaOperator::GetListMetaBlock(const std::string& key, int64_t addr, bool create)
+std::shared_ptr<ListMetaBlock> ListMetaOperator::GetMetaBlock(const std::string& key, int64_t addr, bool create)
 {
     std::string blockkey = EncodeListBlockKey(key, addr);
     std::string blockval;
@@ -282,9 +282,9 @@ ListMetaBlockPtr* ListMeta::IfNeedCreateBlock(int64_t index, int* bidx)
     return blockptr;
 }
 
-rocksdb::Status RedisDB::InsertListMetaAt(const std::string& key, int64_t index, int64_t* addr, int64_t* size)
+rocksdb::Status ListMetaOperator::InsertListMeta(const std::string& key, int64_t index, int64_t* addr, int64_t* size)
 {
-    std::shared_ptr<ListMeta> meta = lop_->GetListMeta(key, true);
+    std::shared_ptr<ListMeta> meta = GetMeta(key, true);
 
     if (meta->IsElementsFull()) {
         return rocksdb::Status::InvalidArgument("Maximum element size limited: " + std::to_string(meta->Size()));
@@ -301,7 +301,7 @@ rocksdb::Status RedisDB::InsertListMetaAt(const std::string& key, int64_t index,
         return rocksdb::Status::InvalidArgument("Maximum block size limited: " + std::to_string(meta->BSize()));
     }
 
-    std::shared_ptr<ListMetaBlock> block = lop_->GetListMetaBlock(key, blockptr->addr, true);
+    std::shared_ptr<ListMetaBlock> block = GetMetaBlock(key, blockptr->addr, true);
 
     block->Insert(bidx, meta->AllocArea());
 
@@ -315,9 +315,9 @@ rocksdb::Status RedisDB::InsertListMetaAt(const std::string& key, int64_t index,
     return rocksdb::Status::OK();
 }
 
-rocksdb::Status RedisDB::RemoveListMetaAt(const std::string& key, int64_t index, int64_t* addr)
+rocksdb::Status ListMetaOperator::RemoveListMeta(const std::string& key, int64_t index, int64_t* addr)
 {
-    std::shared_ptr<ListMeta> meta = lop_->GetListMeta(key, false);
+    std::shared_ptr<ListMeta> meta = GetMeta(key, false);
 
     if (meta == nullptr)
         return rocksdb::Status::OK();
@@ -334,7 +334,7 @@ rocksdb::Status RedisDB::RemoveListMetaAt(const std::string& key, int64_t index,
         return rocksdb::Status::InvalidArgument("invalid index: " + std::to_string(index));
     }
 
-    std::shared_ptr<ListMetaBlock> block = lop_->GetListMetaBlock(key, blockptr->addr, false);
+    std::shared_ptr<ListMetaBlock> block = GetMetaBlock(key, blockptr->addr, false);
     assert(block != nullptr);
 
     *addr = block->Remove(idx);
@@ -344,20 +344,20 @@ rocksdb::Status RedisDB::RemoveListMetaAt(const std::string& key, int64_t index,
     if (blockptr->size == 0) {
         meta->RemoveBlockAt(bidx);
         std::string blockkey = EncodeListBlockKey(key, blockptr->addr);
-        memmeta_.erase(blockkey);
+        memmeta_->erase(blockkey);
     }
 
     meta->DecrSize();
 
     if (meta->Size() == 0) {
         std::string metakey = EncodeListMetaKey(key);
-        memmeta_.erase(metakey);
+        memmeta_->erase(metakey);
     }
 
     return rocksdb::Status::OK();
 }
 
-void RedisDB::GetMetaRangeKeys(std::shared_ptr<ListMeta> meta, int start, int nums, std::vector<std::string>& keys)
+void ListMetaOperator::GetMetaRangeKeys(std::shared_ptr<ListMeta> meta, int start, int nums, std::vector<std::string>& keys)
 {
     int index = 0;
     for (int i = 0; i < meta->BSize(); i++) {
@@ -370,7 +370,7 @@ void RedisDB::GetMetaRangeKeys(std::shared_ptr<ListMeta> meta, int start, int nu
             int begin = start > (index - blockptr->size) ? start : 0;
             int len = nums > blockptr->size ? blockptr->size : nums;
 
-            std::shared_ptr<ListMetaBlock> block = lop_->GetListMetaBlock(meta->Key(), blockptr->addr, false);
+            std::shared_ptr<ListMetaBlock> block = GetMetaBlock(meta->Key(), blockptr->addr, false);
 
             GetMetaBlockRangeKeys(block, begin, len, keys);
 
@@ -379,7 +379,7 @@ void RedisDB::GetMetaRangeKeys(std::shared_ptr<ListMeta> meta, int start, int nu
     }
 }
 
-void RedisDB::GetMetaBlockRangeKeys(std::shared_ptr<ListMetaBlock> block, int start, int nums, std::vector<std::string>& keys)
+void ListMetaOperator::GetMetaBlockRangeKeys(std::shared_ptr<ListMetaBlock> block, int start, int nums, std::vector<std::string>& keys)
 {
     assert(start >= 0);
     assert(nums <= block->Size());
@@ -393,7 +393,7 @@ void RedisDB::GetMetaBlockRangeKeys(std::shared_ptr<ListMetaBlock> block, int st
     }
 }
 
-int64_t RedisDB::GetIndexAddr(std::shared_ptr<ListMeta> meta, const std::string& key, int index)
+int64_t ListMetaOperator::GetIndexAddr(std::shared_ptr<ListMeta> meta, const std::string& key, int index)
 {
     for (int i = 0; i < meta->BSize(); i++) {
         ListMetaBlockPtr* blockptr = meta->BlockAt(i);
@@ -401,11 +401,11 @@ int64_t RedisDB::GetIndexAddr(std::shared_ptr<ListMeta> meta, const std::string&
             index -= blockptr->size;
         }
         else {
-            std::shared_ptr<ListMetaBlock> block = lop_->GetListMetaBlock(key, blockptr->addr, false);
+            std::shared_ptr<ListMetaBlock> block = GetMetaBlock(key, blockptr->addr, false);
 
             if (block->Size() == 0) {
                 std::string blockkey = EncodeListBlockKey(key, blockptr->addr);
-                memmeta_.erase(blockkey);
+                memmeta_->erase(blockkey);
                 return -1;
             }
 

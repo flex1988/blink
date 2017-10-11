@@ -15,7 +15,7 @@ rocksdb::Status RedisDB::LPush(const std::string& key, const std::string& val, i
 
     int64_t addr;
 
-    s = InsertListMetaAt(key, 0, &addr, llen);
+    s = lop_->InsertListMeta(key, 0, &addr, llen);
 
     if (!s.ok()) {
         return s;
@@ -40,7 +40,7 @@ rocksdb::Status RedisDB::LPushX(const std::string& key, const std::string& val, 
 {
     RecordLock l(&mutex_list_record_, key);
 
-    std::shared_ptr<ListMeta> meta = lop_->GetListMeta(key, false);
+    std::shared_ptr<ListMeta> meta = lop_->GetMeta(key, false);
 
     if (meta == nullptr || meta->Size() == 0) {
         *llen = 0;
@@ -53,7 +53,7 @@ rocksdb::Status RedisDB::LPushX(const std::string& key, const std::string& val, 
     rocksdb::Status s;
     int64_t addr;
 
-    s = InsertListMetaAt(key, 0, &addr, llen);
+    s = lop_->InsertListMeta(key, 0, &addr, llen);
 
     if (!s.ok()) {
         return s;
@@ -76,7 +76,7 @@ rocksdb::Status RedisDB::LPushX(const std::string& key, const std::string& val, 
 
 rocksdb::Status RedisDB::LLen(const std::string& key, int64_t* llen)
 {
-    std::shared_ptr<ListMeta> meta = lop_->GetListMeta(key, false);
+    std::shared_ptr<ListMeta> meta = lop_->GetMeta(key, false);
 
     if (meta == nullptr) {
         *llen = 0;
@@ -93,7 +93,7 @@ rocksdb::Status RedisDB::LPop(const std::string& key, std::string& val)
     rocksdb::Status s;
     int64_t addr;
 
-    s = RemoveListMetaAt(key, 0, &addr);
+    s = lop_->RemoveListMeta(key, 0, &addr);
 
     if (!s.ok())
         return s;
@@ -119,7 +119,7 @@ rocksdb::Status RedisDB::LIndex(const std::string& key, const int64_t index, std
 
     RecordLock l(&mutex_list_record_, key);
 
-    std::shared_ptr<ListMeta> meta = lop_->GetListMeta(key, false);
+    std::shared_ptr<ListMeta> meta = lop_->GetMeta(key, false);
 
     if (meta == nullptr) {
         return rocksdb::Status::InvalidArgument("list meta not exists");
@@ -136,7 +136,7 @@ rocksdb::Status RedisDB::LIndex(const std::string& key, const int64_t index, std
             cursor -= blockptr->size;
         }
         else {
-            std::shared_ptr<ListMetaBlock> block = lop_->GetListMetaBlock(key, blockptr->addr, false);
+            std::shared_ptr<ListMetaBlock> block = lop_->GetMetaBlock(key, blockptr->addr, false);
 
             if (block == nullptr) {
                 return rocksdb::Status::InvalidArgument("list meta block not exists");
@@ -157,7 +157,7 @@ rocksdb::Status RedisDB::LRange(const std::string& key, int start, int end, std:
 {
     RecordLock l(&mutex_list_record_, key);
 
-    std::shared_ptr<ListMeta> meta = lop_->GetListMeta(key, false);
+    std::shared_ptr<ListMeta> meta = lop_->GetMeta(key, false);
 
     if (meta == nullptr) {
         return rocksdb::Status::InvalidArgument("list meta not exists");
@@ -177,7 +177,7 @@ rocksdb::Status RedisDB::LRange(const std::string& key, int start, int end, std:
 
     std::vector<rocksdb::Slice> kslices;
 
-    GetMetaRangeKeys(meta, start, end - start + 1, keys);
+    lop_->GetMetaRangeKeys(meta, start, end - start + 1, keys);
 
     for (auto k : keys) {
         kslices.push_back(k);
@@ -196,13 +196,13 @@ rocksdb::Status RedisDB::LSet(const std::string& key, int index, const std::stri
 {
     RecordLock l(&mutex_list_record_, key);
 
-    std::shared_ptr<ListMeta> meta = lop_->GetListMeta(key, false);
+    std::shared_ptr<ListMeta> meta = lop_->GetMeta(key, false);
 
     if (meta == nullptr) {
         return rocksdb::Status::InvalidArgument("no such key");
     }
 
-    int64_t addr = GetIndexAddr(meta, key, index);
+    int64_t addr = lop_->GetIndexAddr(meta, key, index);
 
     if (addr == -1) {
         return rocksdb::Status::Corruption("list meta error");
@@ -219,7 +219,7 @@ rocksdb::Status RedisDB::LRem(const std::string& key, int count, const std::stri
 {
     RecordLock l(&mutex_list_record_, key);
 
-    std::shared_ptr<ListMeta> meta = lop_->GetListMeta(key, false);
+    std::shared_ptr<ListMeta> meta = lop_->GetMeta(key, false);
 
     if (meta == nullptr) {
         return rocksdb::Status::InvalidArgument("no such key");
@@ -233,7 +233,7 @@ rocksdb::Status RedisDB::LRem(const std::string& key, int count, const std::stri
     if (count > 0) {
         index = 0;
         while (count) {
-            addr = GetIndexAddr(meta, key, index++);
+            addr = lop_->GetIndexAddr(meta, key, index++);
             if (addr == -1)
                 break;
 
@@ -247,7 +247,7 @@ rocksdb::Status RedisDB::LRem(const std::string& key, int count, const std::stri
                 s = list_->Delete(rocksdb::WriteOptions(), leaf);
                 assert(s.ok());
 
-                RemoveListMetaAt(key, index - 1, &addr);
+                lop_->RemoveListMeta(key, index - 1, &addr);
                 (*remove)++;
 
                 index--;
@@ -263,7 +263,7 @@ rocksdb::Status RedisDB::LRem(const std::string& key, int count, const std::stri
             if (index < 0)
                 break;
 
-            addr = GetIndexAddr(meta, key, index--);
+            addr = lop_->GetIndexAddr(meta, key, index--);
 
             if (addr == -1)
                 break;
@@ -278,7 +278,7 @@ rocksdb::Status RedisDB::LRem(const std::string& key, int count, const std::stri
                 s = list_->Delete(rocksdb::WriteOptions(), leaf);
                 assert(s.ok());
 
-                RemoveListMetaAt(key, index + 1, &addr);
+                lop_->RemoveListMeta(key, index + 1, &addr);
                 (*remove)++;
 
                 index++;
@@ -289,7 +289,7 @@ rocksdb::Status RedisDB::LRem(const std::string& key, int count, const std::stri
     else {
         index = 0;
         while (1) {
-            addr = GetIndexAddr(meta, key, index++);
+            addr = lop_->GetIndexAddr(meta, key, index++);
             if (addr == -1)
                 break;
 
@@ -303,7 +303,8 @@ rocksdb::Status RedisDB::LRem(const std::string& key, int count, const std::stri
                 s = list_->Delete(rocksdb::WriteOptions(), leaf);
                 assert(s.ok());
 
-                RemoveListMetaAt(key, index - 1, &addr);
+                lop_->RemoveListMeta(key, index - 1, &addr);
+
                 index--;
                 (*remove)++;
             }

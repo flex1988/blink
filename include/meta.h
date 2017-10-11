@@ -150,8 +150,13 @@ class ListMetaOperator {
   public:
     ListMetaOperator(std::unordered_map<std::string, std::shared_ptr<MetaBase>>* memmeta);
 
-    std::shared_ptr<ListMeta> GetListMeta(const std::string& key, bool create);
-    std::shared_ptr<ListMetaBlock> GetListMetaBlock(const std::string& key, int64_t addr, bool create);
+    std::shared_ptr<ListMeta> GetMeta(const std::string& key, bool create);
+    std::shared_ptr<ListMetaBlock> GetMetaBlock(const std::string& key, int64_t addr, bool create);
+    rocksdb::Status InsertListMeta(const std::string& key, int64_t index, int64_t* addr, int64_t* size);
+    rocksdb::Status RemoveListMeta(const std::string& key, int64_t index, int64_t* addr);
+    void GetMetaRangeKeys(std::shared_ptr<ListMeta> meta, int start, int nums, std::vector<std::string>& keys);
+    void GetMetaBlockRangeKeys(std::shared_ptr<ListMetaBlock> block, int start, int nums, std::vector<std::string>& keys);
+    int64_t GetIndexAddr(std::shared_ptr<ListMeta> meta, const std::string& key, int index);
 
   private:
     std::unordered_map<std::string, std::shared_ptr<MetaBase>>* memmeta_;

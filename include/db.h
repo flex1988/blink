@@ -83,14 +83,6 @@ class RedisDB {
 
     void ReloadAppendOnlyCommand(const std::vector<std::string>& argv);
 
-    rocksdb::Status InsertListMetaAt(const std::string& key, int64_t index, int64_t* addr, int64_t* size);
-    rocksdb::Status RemoveListMetaAt(const std::string& key, int64_t index, int64_t* addr);
-
-    void GetMetaRangeKeys(std::shared_ptr<ListMeta> meta, int start, int nums, std::vector<std::string>& keys);
-    void GetMetaBlockRangeKeys(std::shared_ptr<ListMetaBlock> block, int start, int nums, std::vector<std::string>& keys);
-
-    int64_t GetIndexAddr(std::shared_ptr<ListMeta> meta, const std::string& key, int index);
-
     int aof_fd_;
 
     uint64_t meta_log_size_;
