@@ -83,6 +83,24 @@ static ssize_t ReadLineSync(int fd, char* buffer, ssize_t size)
     return nread;
 }
 
+static ssize_t WriteSync(int fd, const char* buffer, ssize_t size)
+{
+
+    ssize_t written = 0;
+    ssize_t nwritten = 0;
+
+    while (size) {
+        nwritten = ::write(fd, buffer + written, size);
+        if (nwritten == -1)
+            return -1;
+
+        written += nwritten;
+        size -= nwritten;
+    }
+
+    return written;
+}
+
 RedisDB::RedisDB(const std::string& path) : metaqueue_(), path_(path), meta_log_size_(0)
 {
     options_.create_if_missing = true;
@@ -326,7 +344,7 @@ void RedisDB::CompactMeta()
     for (auto i = memmeta_.begin(); i != memmeta_.end(); ++i) {
         std::string str = i->second->Serialize();
         LOG_DEBUG << "compact: " << str;
-        nwrite = ::write(snapfd, str.c_str(), str.size());
+        nwrite = WriteSync(snapfd, str.c_str(), str.size());
         assert(nwrite == str.size());
     }
 

@@ -61,9 +61,9 @@ class ListMeta : public MetaBase {
     ListMetaBlockPtr* InsertMetaBlock(int index);
     rocksdb::Status Insert(const std::string& key, uint64_t index, uint64_t* addr);
     bool operator==(const ListMeta& meta);
-    ListMetaBlockPtr* IfNeedCreateBlock(int64_t index, int* bidx);
+    ListMetaBlockPtr* GetMetaBlockPtr(int64_t index, int* bidx);
     ListMetaBlockPtr* BlockAtIndex(int64_t index, int* idx, int* bidx);
-    void RemoveBlockAt(int index);
+    void RemoveBlockPtr(int index);
 
   private:
     std::string key_;

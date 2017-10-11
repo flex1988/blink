@@ -138,7 +138,7 @@ bool ListMeta::operator==(const ListMeta& meta)
     return true;
 }
 
-void ListMeta::RemoveBlockAt(int bidx)
+void ListMeta::RemoveBlockPtr(int bidx)
 {
     for (int cursor = bidx; cursor < bsize_; cursor++) {
         blocks_[cursor] = blocks_[cursor + 1];
@@ -226,7 +226,7 @@ ListMetaBlockPtr* ListMeta::BlockAtIndex(int64_t index, int* idx, int* bidx)
     return blockptr;
 }
 
-ListMetaBlockPtr* ListMeta::IfNeedCreateBlock(int64_t index, int* bidx)
+ListMetaBlockPtr* ListMeta::GetMetaBlockPtr(int64_t index, int* bidx)
 {
     ListMetaBlockPtr* blockptr = nullptr;
     int blockidx;
@@ -289,7 +289,7 @@ rocksdb::Status ListMetaOperator::InsertListMeta(const std::string& key, int64_t
     }
 
     int bidx;
-    ListMetaBlockPtr* blockptr = meta->IfNeedCreateBlock(index, &bidx);
+    ListMetaBlockPtr* blockptr = meta->GetMetaBlockPtr(index, &bidx);
 
     if (blockptr == nullptr) {
         return rocksdb::Status::InvalidArgument("Maximum block size limited: " + std::to_string(meta->BSize()));
@@ -336,7 +336,7 @@ rocksdb::Status ListMetaOperator::RemoveListMeta(const std::string& key, int64_t
     blockptr->size--;
 
     if (blockptr->size == 0) {
-        meta->RemoveBlockAt(bidx);
+        meta->RemoveBlockPtr(bidx);
         std::string blockkey = EncodeListBlockKey(key, blockptr->addr);
         memmeta_->erase(blockkey);
     }
