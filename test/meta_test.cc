@@ -16,7 +16,7 @@ TEST_F(MetaTest, LISTMETA)
 
     for (int i = 0; i < 1000; i++) {
         meta->IncrSize();
-        meta->InsertNewMetaBlockPtr(i);
+        meta->InsertMetaBlock(i);
     }
 
     std::string str = meta->Serialize();

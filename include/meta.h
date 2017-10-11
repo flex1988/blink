@@ -36,17 +36,6 @@ class MetaBase {
     std::string action_buffer_;
 };
 
-class ListIterator {
-  public:
-    ListIterator(ListMeta* meta, int order) : direction_(0), index_(0), meta_(meta) { direction_ = order; };
-    std::string Next();
-
-  private:
-    int direction_;
-    int index_;
-    ListMeta* meta_;
-};
-
 class ListMeta : public MetaBase {
   public:
     ListMeta(const std::string&, Action);
@@ -69,14 +58,12 @@ class ListMeta : public MetaBase {
     void DecrSize() { size_--; };
     int64_t IncrBSize() { return bsize_++; };
     void DecrBSize() { bsize_--; }
-    ListMetaBlockPtr* InsertNewMetaBlockPtr(int index);
+    ListMetaBlockPtr* InsertMetaBlock(int index);
     rocksdb::Status Insert(const std::string& key, uint64_t index, uint64_t* addr);
     bool operator==(const ListMeta& meta);
     ListMetaBlockPtr* IfNeedCreateBlock(int64_t index, int* bidx);
     ListMetaBlockPtr* BlockAtIndex(int64_t index, int* idx, int* bidx);
     void RemoveBlockAt(int index);
-
-    std::shared_ptr<ListIterator> Iterator(int order);
 
   private:
     std::string key_;

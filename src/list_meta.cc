@@ -55,13 +55,7 @@ std::string ListMeta::Serialize()
     return str;
 }
 
-int ListMeta::AllocArea()
-{
-    SaveAction(ALLOC, area_index_ + 1, "");
-    return area_index_++;
-}
-
-std::shared_ptr<ListIterator> ListMeta::Iterator(int order) { return std::shared_ptr<ListIterator>(new ListIterator(this, order)); }
+int ListMeta::AllocArea() { return area_index_++; }
 
 ListMetaOperator::ListMetaOperator(std::unordered_map<std::string, std::shared_ptr<MetaBase>>* memmeta) { memmeta_ = memmeta; }
 
@@ -99,7 +93,7 @@ std::shared_ptr<ListMetaBlock> ListMetaOperator::GetMetaBlock(const std::string&
     return block;
 }
 
-ListMetaBlockPtr* ListMeta::InsertNewMetaBlockPtr(int index)
+ListMetaBlockPtr* ListMeta::InsertMetaBlock(int index)
 {
     if (IsBlocksFull()) {
         return nullptr;
@@ -257,17 +251,17 @@ ListMetaBlockPtr* ListMeta::IfNeedCreateBlock(int64_t index, int* bidx)
     if (blockptr == nullptr) {
         if (index == 0) {
             blockidx = 0;
-            blockptr = InsertNewMetaBlockPtr(0);
+            blockptr = InsertMetaBlock(0);
         }
         else {
             blockidx = BSize();
-            blockptr = InsertNewMetaBlockPtr(BSize());
+            blockptr = InsertMetaBlock(BSize());
         }
     }
 
     // if block is full ,insert a new block
     if (blockptr->size == LIST_BLOCK_KEYS) {
-        blockptr = InsertNewMetaBlockPtr(blockidx);
+        blockptr = InsertMetaBlock(blockidx);
 
         if (blockptr == nullptr) {
             return nullptr;
